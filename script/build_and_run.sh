@@ -53,6 +53,38 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+# Codesign the bundle with a stable identity so the keychain ACL sticks
+# across rebuilds. Without this, every rebuild has a different cdhash and
+# macOS re-prompts for access to `cursor-access-token` / `cursor-refresh-token`
+# on every launch.
+#
+# Priority order:
+#   1. $CODESIGN_IDENTITY env override (exact name or hash)
+#   2. First Apple Development identity in the login keychain (stable across
+#      rebuilds → keychain "Always Allow" sticks forever)
+#   3. Fall back to ad-hoc (`-`) if no real identity is available, with a
+#      warning that keychain prompts will keep returning.
+CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
+if [ -z "$CODESIGN_IDENTITY" ]; then
+  CODESIGN_IDENTITY=$(/usr/bin/security find-identity -p codesigning -v 2>/dev/null \
+    | /usr/bin/awk -F\" '/Apple Development:/ { print $2; exit }')
+fi
+
+ENTITLEMENTS="$ROOT_DIR/script/Cursorcat.entitlements.plist"
+
+if [ -n "$CODESIGN_IDENTITY" ]; then
+  /usr/bin/codesign \
+    --force \
+    --sign "$CODESIGN_IDENTITY" \
+    --entitlements "$ENTITLEMENTS" \
+    "$APP_BUNDLE" >/dev/null
+  echo "signed with: $CODESIGN_IDENTITY"
+else
+  /usr/bin/codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP_BUNDLE" >/dev/null
+  echo "WARNING: no Apple Development identity found; ad-hoc signed." >&2
+  echo "         Keychain will re-prompt on every launch until you sign with a real identity." >&2
+fi
+
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
 }
