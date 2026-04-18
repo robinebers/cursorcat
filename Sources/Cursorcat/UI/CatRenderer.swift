@@ -91,29 +91,34 @@ enum CatRenderer {
         let originY: Int
     }
 
+    // Thin, outline-only Z letters — single-pixel strokes on transparent
+    // interior. Kept visible against either menu bar background by the
+    // white halo pass in `drawStamp`.
     private static let smallZStamp = ZStamp(
         rows: [
-            "######",
-            "######",
-            "....##",
-            "...##.",
-            "..##..",
-            ".##...",
-            "######",
-            "######"
+            "#######",
+            "......#",
+            ".....#.",
+            "....#..",
+            "...#...",
+            "..#....",
+            ".#.....",
+            "#......",
+            "#######"
         ],
-        originX: 19, originY: 4)
+        originX: 19, originY: 3)
 
     private static let bigZStamp = ZStamp(
         rows: [
             "########",
-            "########",
-            ".....###",
-            "....###.",
-            "...###..",
-            "..###...",
-            ".###....",
-            "########",
+            ".......#",
+            "......#.",
+            ".....#..",
+            "....#...",
+            "...#....",
+            "..#.....",
+            ".#......",
+            "#.......",
             "########"
         ],
         originX: 21, originY: 0)
