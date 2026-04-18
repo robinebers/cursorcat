@@ -29,11 +29,18 @@ final class CatAnimator {
     private let sleepTotalTicks = 36_000      //  ~1 h cap; in practice the next
                                               //  poll/interaction wakes the cat
 
+    // Alert hold: keep the startled pose visible long enough to notice.
+    private let alertHoldTicks = 60           //  6 s
+
+    // Idle breathing: flip a 1-source-pixel vertical offset every N ticks.
+    private let breathHoldTicks = 45          //  4.5 s per breath phase
+
     private var timer: Timer?
     private var state: CatState = .idle
     private var idleTime = 0
     private var animation: CatAnimation?
     private var animationFrame = 0
+    private var breathTick = 0
 
     var onFrame: ((NSImage) -> Void)?
 
@@ -117,8 +124,7 @@ final class CatAnimator {
 
         case .alert:
             emit(sprite: .alert, frame: 0)
-            // Hold the alert pose for ~1.5 s.
-            if animationFrame > 15 { resetAnimation() }
+            if animationFrame > alertHoldTicks { resetAnimation() }
             animationFrame += 1
 
         case .runAround:
@@ -130,8 +136,17 @@ final class CatAnimator {
             animationFrame += 1
 
         case nil:
-            emit(sprite: .idle, frame: 0)
+            emitIdleBreath()
         }
+    }
+
+    private func emitIdleBreath() {
+        // Flip a 1-source-pixel Y offset every `breathHoldTicks`.
+        breathTick += 1
+        if breathTick >= breathHoldTicks * 2 { breathTick = 0 }
+        let lifted = breathTick < breathHoldTicks
+        onFrame?(CatRenderer.image(for: CatRenderer.Cell.idle,
+                                   yOffset: lifted ? 0 : 1))
     }
 
     private func resetAnimation() {
@@ -151,7 +166,7 @@ final class CatAnimator {
             if let animation {
                 emitForRunningAnimation(animation, frame: animationFrame)
             } else {
-                emit(sprite: .idle, frame: 0)
+                emitIdleBreath()
             }
         case .alert:      emit(sprite: .alert, frame: 0)
         case .tired:      emit(sprite: .tired, frame: 0)

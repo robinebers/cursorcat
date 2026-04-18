@@ -54,11 +54,15 @@ enum CatRenderer {
     @MainActor
     private static var cache: [String: NSImage] = [:]
 
+    /// Returns the sprite for the given cell. `yOffset` shifts the rendered
+    /// sprite up by N source pixels (1 source px == 2 output px) while keeping
+    /// the same visual footprint — used by the animator to fake a subtle
+    /// breathing motion on the idle pose.
     @MainActor
-    static func image(for cell: (Int, Int)) -> NSImage {
-        let key = "\(cell.0),\(cell.1)"
+    static func image(for cell: (Int, Int), yOffset: Int = 0) -> NSImage {
+        let key = "\(cell.0),\(cell.1):\(yOffset)"
         if let cached = cache[key] { return cached }
-        let img = extractSprite(col: cell.0, row: cell.1)
+        let img = extractSprite(col: cell.0, row: cell.1, yOffset: yOffset)
         cache[key] = img
         return img
     }
@@ -78,11 +82,56 @@ enum CatRenderer {
         return rep
     }()
 
+    /// Bold "Z" overlays stamped on top of the two sleep frames so the
+    /// "zzz" cue reads clearly at menu bar size. The source sprite has a
+    /// 1-pixel-wide Z that disappears when scaled down.
+    private struct ZStamp {
+        let rows: [String]     // `#` = ink, else transparent
+        let originX: Int       // placement in source 32x32 space
+        let originY: Int
+    }
+
+    private static let smallZStamp = ZStamp(
+        rows: [
+            "######",
+            "######",
+            "....##",
+            "...##.",
+            "..##..",
+            ".##...",
+            "######",
+            "######"
+        ],
+        originX: 19, originY: 4)
+
+    private static let bigZStamp = ZStamp(
+        rows: [
+            "########",
+            "########",
+            ".....###",
+            "....###.",
+            "...###..",
+            "..###...",
+            ".###....",
+            "########",
+            "########"
+        ],
+        originX: 21, originY: 0)
+
+    private static func zStamp(forCol col: Int, row: Int) -> ZStamp? {
+        let cell = (col, row)
+        if cell == Cell.sleeping[0] { return smallZStamp }
+        if cell == Cell.sleeping[1] { return bigZStamp }
+        return nil
+    }
+
     /// Crop the 32×32 sprite at (col, row) from the sheet and upscale 2× with
     /// point-sampling so pixels stay crisp. Preserves source RGBA — the white
-    /// body, black outline, and transparent background all survive.
+    /// body, black outline, and transparent background all survive. Sleep
+    /// frames additionally receive a bolder Z overlay. `yOffset` shifts the
+    /// rendered pixels up by N source pixels inside the output buffer.
     @MainActor
-    private static func extractSprite(col: Int, row: Int) -> NSImage {
+    private static func extractSprite(col: Int, row: Int, yOffset: Int = 0) -> NSImage {
         let pxScale = 2
         let bufferSide = cell * pxScale
         let cs = CGColorSpaceCreateDeviceRGB()
@@ -112,17 +161,50 @@ enum CatRenderer {
                 guard let color = sheet.colorAt(x: baseX + xInCell, y: baseY + yInCell),
                       color.alphaComponent > 0
                 else { continue }
-                // Flip Y — CGContext origin is bottom-left.
-                let dstY = (cell - 1 - yInCell) * pxScale
+                // Flip Y — CGContext origin is bottom-left. Shift upward by
+                // `yOffset` source pixels (= +yOffset in CG's flipped space).
+                let dstY = (cell - 1 - yInCell + yOffset) * pxScale
                 let dstX = xInCell * pxScale
                 ctx.setFillColor(color.cgColor)
                 ctx.fill(CGRect(x: dstX, y: dstY, width: pxScale, height: pxScale))
             }
         }
 
+        if let stamp = zStamp(forCol: col, row: row) {
+            drawStamp(stamp, into: ctx, pxScale: pxScale)
+        }
+
         guard let cg = ctx.makeImage() else { return NSImage(size: imageSize) }
         let image = NSImage(cgImage: cg, size: imageSize)
         image.isTemplate = false
         return image
+    }
+
+    /// Stamp a bold Z into the render context. The Z is drawn with a 1-pixel
+    /// white "halo" so it stays visible on dark menu bar backgrounds.
+    private static func drawStamp(_ stamp: ZStamp, into ctx: CGContext, pxScale: Int) {
+        let halo = CGColor(gray: 1, alpha: 1)
+        let ink = CGColor(gray: 0, alpha: 1)
+
+        // Two passes: first paint a white halo (stamp shifted by ±1 px in each
+        // direction), then paint the black Z on top. Cheap outline effect.
+        for pass in 0...1 {
+            ctx.setFillColor(pass == 0 ? halo : ink)
+            let offsets: [(Int, Int)] = pass == 0
+                ? [(-1, 0), (1, 0), (0, -1), (0, 1)]
+                : [(0, 0)]
+
+            for (rowIdx, rowStr) in stamp.rows.enumerated() {
+                for (colIdx, ch) in rowStr.enumerated() where ch == "#" {
+                    for (dx, dy) in offsets {
+                        let srcX = stamp.originX + colIdx + dx
+                        let srcY = stamp.originY + rowIdx + dy
+                        let dstX = srcX * pxScale
+                        let dstY = (cell - 1 - srcY) * pxScale
+                        ctx.fill(CGRect(x: dstX, y: dstY, width: pxScale, height: pxScale))
+                    }
+                }
+            }
+        }
     }
 }
