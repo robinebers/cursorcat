@@ -33,8 +33,8 @@ enum ScreenshotFixture {
                 apiPercentLeft: 73,
                 onDemandRemaining: 100,
                 onDemandLimit: 100,
-                creditsLeft: 1_983_700,
-                creditsTotal: 2_000_000,
+                creditsLeft: 48_320,
+                creditsTotal: 50_000,
                 lastUpdated: now,
                 lastError: nil,
                 isLoggedIn: true
@@ -53,8 +53,8 @@ enum ScreenshotFixture {
                 apiPercentLeft: 14,
                 onDemandRemaining: 3,
                 onDemandLimit: 100,
-                creditsLeft: 61_240,
-                creditsTotal: 2_000_000,
+                creditsLeft: 1_540,
+                creditsTotal: 50_000,
                 lastUpdated: now,
                 lastError: nil,
                 isLoggedIn: true

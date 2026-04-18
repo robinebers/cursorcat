@@ -14,14 +14,21 @@ final class StatusItemController: NSObject {
     private let scheduler: PollScheduler
     private let menuBuilder: ActionsMenuBuilder
     private let popover: NSPopover
+    private let behavior: CatBehavior
+    private let screenshotDirector: ScreenshotDirector
     private var cancellables: Set<AnyCancellable> = []
     private var activeFixture: ScreenshotFixture?
 
-    init(store: UsageStore, animator: CatAnimator, scheduler: PollScheduler) {
+    init(store: UsageStore,
+         animator: CatAnimator,
+         scheduler: PollScheduler,
+         behavior: CatBehavior) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.store = store
         self.animator = animator
         self.scheduler = scheduler
+        self.behavior = behavior
+        self.screenshotDirector = ScreenshotDirector(animator: animator)
         let builder = ActionsMenuBuilder(
             target: StatusItemController.self as AnyObject, // placeholder
             refreshSelector: #selector(StatusItemController.refreshNow),
@@ -117,6 +124,17 @@ final class StatusItemController: NSObject {
             popover.performClose(nil)
             return
         }
+        // Pin the popover's reported content size to the SwiftUI frame
+        // width. Without this, `NSHostingController` feeds AppKit a
+        // larger intrinsic size and the popover body lays out around
+        // that wider size while SwiftUI only paints content in
+        // `DashboardView.width`. The invisible padding shows up as a
+        // leftward shift of the body relative to the arrow.
+        if let hosted = popover.contentViewController?.view,
+           hosted.fittingSize.height > 0 {
+            popover.contentSize = NSSize(width: DashboardView.width,
+                                         height: hosted.fittingSize.height)
+        }
         popover.show(relativeTo: button.bounds,
                      of: button,
                      preferredEdge: .minY)
@@ -197,14 +215,29 @@ final class StatusItemController: NSObject {
         switch sender.tag {
         case 1:
             activeFixture = .positive
-            store.applyFixture(.positive)
+            enterScreenshotMode(.positive)
         case 2:
             activeFixture = .negative
-            store.applyFixture(.negative)
+            enterScreenshotMode(.negative)
         default:
             activeFixture = nil
-            store.exitScreenshotMode()
-            scheduler.triggerNow()
+            exitScreenshotMode()
         }
+    }
+
+    private func enterScreenshotMode(_ fixture: ScreenshotFixture) {
+        store.applyFixture(fixture)
+        // Pause the snapshot-driven phase machine so only the director is
+        // firing animations — otherwise the two can collide on the same
+        // `animator.play(_:)` call.
+        behavior.stop()
+        screenshotDirector.start()
+    }
+
+    private func exitScreenshotMode() {
+        screenshotDirector.stop()
+        behavior.start()
+        store.exitScreenshotMode()
+        scheduler.triggerNow()
     }
 }

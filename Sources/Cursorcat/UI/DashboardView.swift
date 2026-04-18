@@ -14,6 +14,13 @@ struct DashboardActions {
 /// logged-out card when no tokens are present. Branches on the live
 /// `UsageStore` snapshot.
 struct DashboardView: View {
+    /// Fixed popover body width. Shared with `StatusItemController` so
+    /// the AppKit-side `NSPopover.contentSize` can't drift from the
+    /// SwiftUI `.frame(width:)` — if they disagree, the popover lays out
+    /// around the larger size and the arrow ends up visually off-center
+    /// even when AppKit's geometry is technically correct.
+    static let width: CGFloat = 280
+
     @ObservedObject var store: UsageStore
     let actions: DashboardActions
 
@@ -29,8 +36,7 @@ struct DashboardView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .frame(width: 280)
-        .background(.thickMaterial)
+        .frame(width: Self.width)
     }
 }
 

@@ -37,7 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller = StatusItemController(
             store: store,
             animator: animator,
-            scheduler: scheduler
+            scheduler: scheduler,
+            behavior: behavior
         )
 
         behavior.start()
