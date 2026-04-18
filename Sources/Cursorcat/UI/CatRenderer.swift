@@ -82,53 +82,66 @@ enum CatRenderer {
         return rep
     }()
 
-    /// Bold "Z" overlays stamped on top of the two sleep frames so the
-    /// "zzz" cue reads clearly at menu bar size. The source sprite has a
-    /// 1-pixel-wide Z that disappears when scaled down.
+    /// Z stamps painted on top of the two sleep frames. We clear the upper-
+    /// left region of the source sprite (where the oneko original's tiny Zs
+    /// live) and redraw two crisp Zs ourselves so they're legible at menu
+    /// bar size.
     private struct ZStamp {
         let rows: [String]     // `#` = ink, else transparent
         let originX: Int       // placement in source 32x32 space
         let originY: Int
     }
 
-    // Thin, outline-only Z letters — single-pixel strokes on transparent
-    // interior. Kept visible against either menu bar background by the
-    // white halo pass in `drawStamp`.
-    private static let smallZStamp = ZStamp(
-        rows: [
-            "#######",
-            "......#",
-            ".....#.",
-            "....#..",
-            "...#...",
-            "..#....",
-            ".#.....",
-            "#......",
-            "#######"
-        ],
-        originX: 19, originY: 3)
+    /// Bold 2-pixel-stroke Z, 6x8.
+    private static let smallZRows: [String] = [
+        "######",
+        "######",
+        "....##",
+        "...##.",
+        "..##..",
+        ".##...",
+        "######",
+        "######"
+    ]
 
-    private static let bigZStamp = ZStamp(
-        rows: [
-            "########",
-            ".......#",
-            "......#.",
-            ".....#..",
-            "....#...",
-            "...#....",
-            "..#.....",
-            ".#......",
-            "#.......",
-            "########"
-        ],
-        originX: 21, originY: 0)
+    /// Bold 2-pixel-stroke Z, 8x10.
+    private static let bigZRows: [String] = [
+        "########",
+        "########",
+        "......##",
+        ".....##.",
+        "....##..",
+        "...##...",
+        "..##....",
+        ".##.....",
+        "########",
+        "########"
+    ]
 
-    private static func zStamp(forCol col: Int, row: Int) -> ZStamp? {
+    /// Two Zs drift upward together across the two sleep frames. In frame A
+    /// the small Z is closer to the cat's head and the big Z is higher; in
+    /// frame B both drift further up-left.
+    private static func zStampsFor(col: Int, row: Int) -> [ZStamp] {
         let cell = (col, row)
-        if cell == Cell.sleeping[0] { return smallZStamp }
-        if cell == Cell.sleeping[1] { return bigZStamp }
-        return nil
+        if cell == Cell.sleeping[0] {
+            return [
+                ZStamp(rows: smallZRows, originX: 11, originY: 6),
+                ZStamp(rows: bigZRows, originX: 2, originY: 1)
+            ]
+        }
+        if cell == Cell.sleeping[1] {
+            return [
+                ZStamp(rows: smallZRows, originX: 12, originY: 3),
+                ZStamp(rows: bigZRows, originX: 3, originY: 0)
+            ]
+        }
+        return []
     }
+
+    /// Rectangle of source pixels we clear out before drawing our Zs, to
+    /// suppress the oneko originals. Upper-left quadrant only — the sleeping
+    /// cat body is in the lower-right.
+    private static let sleepClearRect = (x: 0, y: 0, w: 22, h: 12)
 
     /// Crop the 32×32 sprite at (col, row) from the sheet and upscale 2× with
     /// point-sampling so pixels stay crisp. Preserves source RGBA — the white
@@ -175,8 +188,12 @@ enum CatRenderer {
             }
         }
 
-        if let stamp = zStamp(forCol: col, row: row) {
-            drawStamp(stamp, into: ctx, pxScale: pxScale)
+        let stamps = zStampsFor(col: col, row: row)
+        if !stamps.isEmpty {
+            clearSleepZRegion(into: ctx, pxScale: pxScale)
+            for stamp in stamps {
+                drawStamp(stamp, into: ctx, pxScale: pxScale)
+            }
         }
 
         guard let cg = ctx.makeImage() else { return NSImage(size: imageSize) }
@@ -185,31 +202,28 @@ enum CatRenderer {
         return image
     }
 
-    /// Stamp a bold Z into the render context. The Z is drawn with a 1-pixel
-    /// white "halo" so it stays visible on dark menu bar backgrounds.
+    /// Stamp a Z into the render context as a white 2-pixel-stroke letter.
     private static func drawStamp(_ stamp: ZStamp, into ctx: CGContext, pxScale: Int) {
-        let halo = CGColor(gray: 1, alpha: 1)
-        let ink = CGColor(gray: 0, alpha: 1)
-
-        // Two passes: first paint a white halo (stamp shifted by ±1 px in each
-        // direction), then paint the black Z on top. Cheap outline effect.
-        for pass in 0...1 {
-            ctx.setFillColor(pass == 0 ? halo : ink)
-            let offsets: [(Int, Int)] = pass == 0
-                ? [(-1, 0), (1, 0), (0, -1), (0, 1)]
-                : [(0, 0)]
-
-            for (rowIdx, rowStr) in stamp.rows.enumerated() {
-                for (colIdx, ch) in rowStr.enumerated() where ch == "#" {
-                    for (dx, dy) in offsets {
-                        let srcX = stamp.originX + colIdx + dx
-                        let srcY = stamp.originY + rowIdx + dy
-                        let dstX = srcX * pxScale
-                        let dstY = (cell - 1 - srcY) * pxScale
-                        ctx.fill(CGRect(x: dstX, y: dstY, width: pxScale, height: pxScale))
-                    }
-                }
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        for (rowIdx, rowStr) in stamp.rows.enumerated() {
+            for (colIdx, ch) in rowStr.enumerated() where ch == "#" {
+                let srcX = stamp.originX + colIdx
+                let srcY = stamp.originY + rowIdx
+                let dstX = srcX * pxScale
+                let dstY = (cell - 1 - srcY) * pxScale
+                ctx.fill(CGRect(x: dstX, y: dstY, width: pxScale, height: pxScale))
             }
         }
+    }
+
+    /// Wipe the source sprite's upper-left Z area to transparent so our
+    /// custom Zs aren't fighting the original pixels underneath.
+    private static func clearSleepZRegion(into ctx: CGContext, pxScale: Int) {
+        let r = sleepClearRect
+        let dstX = r.x * pxScale
+        // CGContext origin is bottom-left; flip the y range.
+        let dstY = (cell - r.y - r.h) * pxScale
+        let rect = CGRect(x: dstX, y: dstY, width: r.w * pxScale, height: r.h * pxScale)
+        ctx.clear(rect)
     }
 }
