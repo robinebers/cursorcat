@@ -141,12 +141,14 @@ final class CatAnimator {
     }
 
     private func emitIdleBreath() {
-        // Flip a 1-source-pixel Y offset every `breathHoldTicks`.
+        // Alternate between the resting pose and a "shoulder lift" pose where
+        // rows above the torso sit 1 px higher. Paws and sitting body stay
+        // planted across both phases.
         breathTick += 1
         if breathTick >= breathHoldTicks * 2 { breathTick = 0 }
-        let lifted = breathTick < breathHoldTicks
+        let lifted = breathTick >= breathHoldTicks
         onFrame?(CatRenderer.image(for: CatRenderer.Cell.idle,
-                                   yOffset: lifted ? 0 : 1))
+                                   breathLifted: lifted))
     }
 
     private func resetAnimation() {

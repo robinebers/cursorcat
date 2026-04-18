@@ -12,9 +12,12 @@ enum CatState: Equatable {
 }
 
 /// Extracts individual 32x32 frames from `oneko.gif` (adryd325/oneko.js, MIT)
-/// and returns them as full-colour `NSImage`s (white body + black outline +
-/// transparent background, exactly as authored). Rendered as non-template so
-/// the body/outline/detail shading survives the menu bar.
+/// and returns them as **template** `NSImage`s that adapt to the menu bar
+/// appearance. Template images must be black-and-clear only, but AppKit
+/// preserves alpha on template ink — so we emit dark source pixels at full
+/// alpha and the white body fill at reduced alpha. macOS recolours the ink
+/// (white on dark bars, black on light) while the alpha gradient is kept,
+/// giving a two-tone look that works everywhere.
 enum CatRenderer {
     /// Source sheet layout: 8 columns × 4 rows of 32×32 sprites.
     private static let cell = 32
@@ -54,15 +57,20 @@ enum CatRenderer {
     @MainActor
     private static var cache: [String: NSImage] = [:]
 
-    /// Returns the sprite for the given cell. `yOffset` shifts the rendered
-    /// sprite up by N source pixels (1 source px == 2 output px) while keeping
-    /// the same visual footprint — used by the animator to fake a subtle
-    /// breathing motion on the idle pose.
+    /// Row in the 32-pixel cell where the cat's sitting torso starts. Rows at
+    /// or below this row stay fixed during breath; rows above get sampled one
+    /// row lower, producing a "shoulder lift" inhale without moving paws.
+    private static let breathSplitRow = 19
+
+    /// Returns the sprite for the given cell. When `breathLifted` is true,
+    /// the upper body (rows 0..breathSplitRow-1) samples one row deeper in
+    /// the source, so the head + shoulders rise by 1 px while the sitting
+    /// torso and paws stay perfectly still.
     @MainActor
-    static func image(for cell: (Int, Int), yOffset: Int = 0) -> NSImage {
-        let key = "\(cell.0),\(cell.1):\(yOffset)"
+    static func image(for cell: (Int, Int), breathLifted: Bool = false) -> NSImage {
+        let key = "\(cell.0),\(cell.1):\(breathLifted)"
         if let cached = cache[key] { return cached }
-        let img = extractSprite(col: cell.0, row: cell.1, yOffset: yOffset)
+        let img = extractSprite(col: cell.0, row: cell.1, breathLifted: breathLifted)
         cache[key] = img
         return img
     }
@@ -146,10 +154,13 @@ enum CatRenderer {
     /// Crop the 32×32 sprite at (col, row) from the sheet and upscale 2× with
     /// point-sampling so pixels stay crisp. Preserves source RGBA — the white
     /// body, black outline, and transparent background all survive. Sleep
-    /// frames additionally receive a bolder Z overlay. `yOffset` shifts the
-    /// rendered pixels up by N source pixels inside the output buffer.
+    /// frames additionally receive a bolder Z overlay. When `breathLifted` is
+    /// true, every output row above `breathSplitRow` samples the source one
+    /// row lower, duplicating the split row at the seam — the visible effect
+    /// is a subtle 1-pixel shoulder/head lift while the sitting torso and
+    /// paws stay planted.
     @MainActor
-    private static func extractSprite(col: Int, row: Int, yOffset: Int = 0) -> NSImage {
+    private static func extractSprite(col: Int, row: Int, breathLifted: Bool = false) -> NSImage {
         let pxScale = 2
         let bufferSide = cell * pxScale
         let cs = CGColorSpaceCreateDeviceRGB()
@@ -175,15 +186,22 @@ enum CatRenderer {
         let baseY = row * cell
 
         for yInCell in 0..<cell {
+            // For the lifted frame, rows 0..splitRow-1 sample one row deeper
+            // in the source; the split row itself and everything below it
+            // sample their own row unchanged.
+            let sourceYInCell = (breathLifted && yInCell < Self.breathSplitRow)
+                ? yInCell + 1
+                : yInCell
             for xInCell in 0..<cell {
-                guard let color = sheet.colorAt(x: baseX + xInCell, y: baseY + yInCell),
+                guard let color = sheet.colorAt(x: baseX + xInCell,
+                                                 y: baseY + sourceYInCell),
                       color.alphaComponent > 0
                 else { continue }
-                // Flip Y — CGContext origin is bottom-left. Shift upward by
-                // `yOffset` source pixels (= +yOffset in CG's flipped space).
-                let dstY = (cell - 1 - yInCell + yOffset) * pxScale
+                // Flip Y — CGContext origin is bottom-left.
+                let dstY = (cell - 1 - yInCell) * pxScale
                 let dstX = xInCell * pxScale
-                ctx.setFillColor(color.cgColor)
+                let templateColor = Self.templateInk(from: color)
+                ctx.setFillColor(templateColor)
                 ctx.fill(CGRect(x: dstX, y: dstY, width: pxScale, height: pxScale))
             }
         }
@@ -198,13 +216,32 @@ enum CatRenderer {
 
         guard let cg = ctx.makeImage() else { return NSImage(size: imageSize) }
         let image = NSImage(cgImage: cg, size: imageSize)
-        image.isTemplate = false
+        image.isTemplate = true
         return image
     }
 
-    /// Stamp a Z into the render context as a white 2-pixel-stroke letter.
+    /// Map a source sprite pixel to its template-ink equivalent.
+    /// Template images are "black + alpha" only; AppKit recolours on render.
+    /// Dark source pixels (outlines, eyes, whiskers, nose, alert rays, etc.)
+    /// stay at full opacity; lighter body-fill pixels drop to a faded alpha
+    /// so the silhouette still reads without overpowering the detail work.
+    private static func templateInk(from color: NSColor) -> CGColor {
+        let rgb = color.usingColorSpace(.genericRGB) ?? color
+        let luma = 0.299 * rgb.redComponent
+            + 0.587 * rgb.greenComponent
+            + 0.114 * rgb.blueComponent
+        let sourceAlpha = Double(color.alphaComponent)
+        // Dark outline pixels render as strong ink; light body fill renders as
+        // faded ink so it still indicates the body mass at menu-bar size.
+        let strength: Double = luma < 0.4 ? 1.0 : 0.35
+        return CGColor(gray: 0, alpha: CGFloat(sourceAlpha * strength))
+    }
+
+    /// Stamp a Z into the render context as a 2-pixel-stroke black letter.
+    /// Because the final image is a template, AppKit flips black → white on
+    /// dark menu bars automatically, so the Z stays legible everywhere.
     private static func drawStamp(_ stamp: ZStamp, into ctx: CGContext, pxScale: Int) {
-        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.setFillColor(CGColor(gray: 0, alpha: 1))
         for (rowIdx, rowStr) in stamp.rows.enumerated() {
             for (colIdx, ch) in rowStr.enumerated() where ch == "#" {
                 let srcX = stamp.originX + colIdx
