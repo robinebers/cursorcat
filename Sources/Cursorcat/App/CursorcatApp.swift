@@ -18,6 +18,7 @@ struct CursorcatApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: UsageStore!
     private var animator: CatAnimator!
+    private var behavior: CatBehavior!
     private var scheduler: PollScheduler!
     private var controller: StatusItemController!
     private var auth: CursorAuth!
@@ -31,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         api = CursorAPI(auth: auth)
         store = UsageStore()
         animator = CatAnimator()
+        behavior = CatBehavior(animator: animator, store: store)
         scheduler = PollScheduler(api: api, store: store, auth: auth)
         controller = StatusItemController(
             store: store,
@@ -38,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             scheduler: scheduler
         )
 
+        behavior.start()
         scheduler.start()
     }
 

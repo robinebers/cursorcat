@@ -23,7 +23,11 @@ final class MenuBuilder {
 
     /// Interact submenu entries. Tag on each item identifies the animation.
     static let interactions: [(title: String, tag: Int)] = [
-        ("Scratch", 0),
+        ("Scratch head", 0),
+        ("Scratch up", 4),
+        ("Scratch down", 5),
+        ("Yawn", 6),
+        ("Nap", 7),
         ("Sleep", 1),
         ("Alert", 2),
         ("Run around", 3)
@@ -31,10 +35,14 @@ final class MenuBuilder {
 
     static func animation(forTag tag: Int) -> CatAnimation? {
         switch tag {
-        case 0: return .scratching
+        case 0: return .scratchHead
         case 1: return .sleeping
         case 2: return .alert
         case 3: return .runAround
+        case 4: return .scratchUp
+        case 5: return .scratchDown
+        case 6: return .yawn
+        case 7: return .sleepBrief
         default: return nil
         }
     }

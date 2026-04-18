@@ -36,6 +36,12 @@ enum CatRenderer {
         static let tired = (3, 2)
         static let sleeping = [(2, 0), (2, 1)]
         static let scratchSelf = [(5, 0), (6, 0), (7, 0)]
+        /// Paws reaching up (canonical oneko.js "scratchWallN").
+        static let scratchWallN: [(Int, Int)] = [(0, 0), (0, 1)]
+        /// Paws on the floor (canonical oneko.js "scratchWallS").
+        static let scratchWallS: [(Int, Int)] = [(7, 1), (6, 2)]
+        /// Alias: scratching own head uses the self-scratch cycle.
+        static let scratchHead = scratchSelf
 
         // 8 compass-direction running sprites, 2 frames each.
         static let runN  = [(1, 2), (1, 3)]
