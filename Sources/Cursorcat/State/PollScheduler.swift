@@ -62,6 +62,10 @@ final class PollScheduler {
     }
 
     private func runOnce() async {
+        if store.isScreenshotMode {
+            Log.poll.info("poll skipped: screenshot mode")
+            return
+        }
         if isRefreshing {
             Log.poll.info("poll skipped: already refreshing")
             return

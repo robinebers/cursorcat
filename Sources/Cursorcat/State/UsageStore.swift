@@ -8,7 +8,7 @@ struct UsageSnapshot: Equatable {
     var last7DaysSpend: Int?
 
     var billingCycleSpend: Int?
-    var billingCycleResetInDays: Int?
+    var billingCycleResetsAt: Date?
 
     var plan: String?
     var requestsUsed: Int?
@@ -21,6 +21,7 @@ struct UsageSnapshot: Equatable {
     var onDemandLimit: Int?
 
     var creditsLeft: Int?
+    var creditsTotal: Int?
 
     var lastUpdated: Date?
     var lastError: String?
@@ -33,6 +34,11 @@ struct UsageSnapshot: Equatable {
 @MainActor
 final class UsageStore: ObservableObject {
     @Published private(set) var snapshot: UsageSnapshot = .loading
+
+    /// When true, the store has been pinned to a hand-crafted fixture
+    /// (see `ScreenshotFixture`) and the poll scheduler must not
+    /// overwrite the snapshot until `exitScreenshotMode()` is called.
+    @Published private(set) var isScreenshotMode: Bool = false
 
     func applySnapshot(_ api: APISnapshot, now: Date = Date(), calendar: Calendar = .current) {
         var next = snapshot
@@ -76,8 +82,7 @@ final class UsageStore: ObservableObject {
         }
 
         if let endStr = api.usage?.billingCycleEnd, let end = endStr.asUnixMillisDate {
-            let seconds = end.timeIntervalSince(now)
-            next.billingCycleResetInDays = seconds > 0 ? Int(seconds / 86_400) : 0
+            next.billingCycleResetsAt = end
         }
 
         if let spend = api.usage?.spendLimitUsage {
@@ -96,11 +101,15 @@ final class UsageStore: ObservableObject {
         if let credits = api.credits, credits.hasCreditGrants == true {
             let total = Int(credits.totalCents ?? "0") ?? 0
             let used = Int(credits.usedCents ?? "0") ?? 0
+            let stripeBonus = max(0, api.stripeBalanceCents)
             next.creditsLeft = max(0, total - used) + api.stripeBalanceCents
+            next.creditsTotal = total + stripeBonus
         } else if api.stripeBalanceCents > 0 {
             next.creditsLeft = api.stripeBalanceCents
+            next.creditsTotal = api.stripeBalanceCents
         } else {
             next.creditsLeft = nil
+            next.creditsTotal = nil
         }
 
         snapshot = next
@@ -114,5 +123,20 @@ final class UsageStore: ObservableObject {
         var next = snapshot
         next.lastError = message
         snapshot = next
+    }
+
+    /// Pins the store to a fixture snapshot and turns on screenshot
+    /// mode. `PollScheduler` early-returns while this flag is set so the
+    /// fixture survives across wake events and manual refreshes.
+    func applyFixture(_ fixture: ScreenshotFixture) {
+        isScreenshotMode = true
+        snapshot = fixture.snapshot()
+    }
+
+    /// Leaves screenshot mode but does NOT clear the snapshot — the
+    /// caller is expected to trigger a real poll which will overwrite it
+    /// within seconds.
+    func exitScreenshotMode() {
+        isScreenshotMode = false
     }
 }
