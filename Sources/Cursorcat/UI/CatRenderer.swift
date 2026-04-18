@@ -12,10 +12,9 @@ enum CatState: Equatable {
 }
 
 /// Extracts individual 32x32 frames from `oneko.gif` (adryd325/oneko.js, MIT)
-/// and returns them as monochrome template `NSImage`s. "Monochrome" here means
-/// only the dark outline pixels from the source sheet are kept — the white
-/// interior fill is dropped so the cat renders as a pure outline that adapts
-/// to light/dark menu bar via `isTemplate = true`.
+/// and returns them as full-colour `NSImage`s (white body + black outline +
+/// transparent background, exactly as authored). Rendered as non-template so
+/// the body/outline/detail shading survives the menu bar.
 enum CatRenderer {
     /// Source sheet layout: 8 columns × 4 rows of 32×32 sprites.
     private static let cell = 32
@@ -59,7 +58,7 @@ enum CatRenderer {
     static func image(for cell: (Int, Int)) -> NSImage {
         let key = "\(cell.0),\(cell.1)"
         if let cached = cache[key] { return cached }
-        let img = extractOutline(col: cell.0, row: cell.1)
+        let img = extractSprite(col: cell.0, row: cell.1)
         cache[key] = img
         return img
     }
@@ -79,15 +78,12 @@ enum CatRenderer {
         return rep
     }()
 
-    /// Crop the sprite at (col, row) and convert to a template NSImage using
-    /// only dark pixels. We sample the source at integer 32-pixel cell
-    /// positions; the sheet's transparent and white pixels become transparent,
-    /// dark pixels (the black outline + eyes + whiskers) become ink.
+    /// Crop the 32×32 sprite at (col, row) from the sheet and upscale 2× with
+    /// point-sampling so pixels stay crisp. Preserves source RGBA — the white
+    /// body, black outline, and transparent background all survive.
     @MainActor
-    private static func extractOutline(col: Int, row: Int) -> NSImage {
-        let inkColor = CGColor(gray: 0, alpha: 1)
-        let transparent = CGColor(gray: 0, alpha: 0)
-        let pxScale = 2  // render into a 2x buffer for crisp pixels
+    private static func extractSprite(col: Int, row: Int) -> NSImage {
+        let pxScale = 2
         let bufferSide = cell * pxScale
         let cs = CGColorSpaceCreateDeviceRGB()
         guard let ctx = CGContext(
@@ -103,9 +99,6 @@ enum CatRenderer {
         }
         ctx.setShouldAntialias(false)
         ctx.interpolationQuality = .none
-        ctx.setFillColor(transparent)
-        ctx.fill(CGRect(x: 0, y: 0, width: bufferSide, height: bufferSide))
-        ctx.setFillColor(inkColor)
 
         guard let sheet = sheetBitmap else {
             return NSImage(size: imageSize)
@@ -116,33 +109,20 @@ enum CatRenderer {
 
         for yInCell in 0..<cell {
             for xInCell in 0..<cell {
-                let px = baseX + xInCell
-                let py = baseY + yInCell
-                guard let color = sheet.colorAt(x: px, y: py) else { continue }
-                if isInk(color) {
-                    // Flip Y — CGContext origin is bottom-left.
-                    let dstY = (cell - 1 - yInCell) * pxScale
-                    let dstX = xInCell * pxScale
-                    ctx.fill(CGRect(x: dstX, y: dstY, width: pxScale, height: pxScale))
-                }
+                guard let color = sheet.colorAt(x: baseX + xInCell, y: baseY + yInCell),
+                      color.alphaComponent > 0
+                else { continue }
+                // Flip Y — CGContext origin is bottom-left.
+                let dstY = (cell - 1 - yInCell) * pxScale
+                let dstX = xInCell * pxScale
+                ctx.setFillColor(color.cgColor)
+                ctx.fill(CGRect(x: dstX, y: dstY, width: pxScale, height: pxScale))
             }
         }
 
         guard let cg = ctx.makeImage() else { return NSImage(size: imageSize) }
         let image = NSImage(cgImage: cg, size: imageSize)
-        image.isTemplate = true
+        image.isTemplate = false
         return image
-    }
-
-    /// Treat a source pixel as "ink" when it's opaque and darker than mid-gray.
-    /// This captures Neko's black outline, eye dots, and whiskers while
-    /// dropping the white body fill to produce an outline-only silhouette.
-    private static func isInk(_ color: NSColor) -> Bool {
-        guard color.alphaComponent > 0.5 else { return false }
-        guard let rgb = color.usingColorSpace(.genericRGB) else { return false }
-        let luma = 0.299 * rgb.redComponent
-            + 0.587 * rgb.greenComponent
-            + 0.114 * rgb.blueComponent
-        return luma < 0.4
     }
 }
