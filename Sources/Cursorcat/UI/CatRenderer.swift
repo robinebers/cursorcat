@@ -193,15 +193,27 @@ enum CatRenderer {
                 ? yInCell + 1
                 : yInCell
             for xInCell in 0..<cell {
-                guard let color = sheet.colorAt(x: baseX + xInCell,
-                                                 y: baseY + sourceYInCell),
+                let sx = baseX + xInCell
+                let sy = baseY + sourceYInCell
+                guard let color = sheet.colorAt(x: sx, y: sy),
                       color.alphaComponent > 0
                 else { continue }
-                // Flip Y — CGContext origin is bottom-left.
+                let isDark = Self.isDark(color)
+                // Body fill is kept (1.0). Dark pixels are dropped by default,
+                // except alert rays — dark pixels with no body-fill neighbour
+                // in the source sheet, which sit outside the cat silhouette —
+                // render at 50% so the exclamation sparks survive.
+                var alpha: Double = 0.0
+                if !isDark {
+                    alpha = 1.0
+                } else if Self.isDetachedDark(sheet: sheet, x: sx, y: sy) {
+                    alpha = 1.0
+                }
+                if alpha == 0 { continue }
                 let dstY = (cell - 1 - yInCell) * pxScale
                 let dstX = xInCell * pxScale
-                let templateColor = Self.templateInk(from: color)
-                ctx.setFillColor(templateColor)
+                ctx.setFillColor(CGColor(gray: 0,
+                                         alpha: CGFloat(Double(color.alphaComponent) * alpha)))
                 ctx.fill(CGRect(x: dstX, y: dstY, width: pxScale, height: pxScale))
             }
         }
@@ -220,28 +232,37 @@ enum CatRenderer {
         return image
     }
 
-    /// Map a source sprite pixel to its template-ink equivalent.
-    /// Template images are "black + alpha" only; AppKit recolours on render.
-    /// Dark source pixels (outlines, eyes, whiskers, nose, alert rays, etc.)
-    /// stay at full opacity; lighter body-fill pixels drop to a faded alpha
-    /// so the silhouette still reads without overpowering the detail work.
-    private static func templateInk(from color: NSColor) -> CGColor {
+    /// True when the source pixel reads as a dark outline / detail pixel
+    /// (outline, eye, whisker, nose, alert ray) rather than the white body
+    /// fill. Uses perceptual luminance so faint grey shading still counts.
+    private static func isDark(_ color: NSColor) -> Bool {
         let rgb = color.usingColorSpace(.genericRGB) ?? color
         let luma = 0.299 * rgb.redComponent
             + 0.587 * rgb.greenComponent
             + 0.114 * rgb.blueComponent
-        let sourceAlpha = Double(color.alphaComponent)
-        // Dark outline pixels render as strong ink; light body fill renders as
-        // faded ink so it still indicates the body mass at menu-bar size.
-        let strength: Double = luma < 0.4 ? 1.0 : 0.35
-        return CGColor(gray: 0, alpha: CGFloat(sourceAlpha * strength))
+        return luma < 0.4
+    }
+
+    /// True when a dark source pixel has no body-fill (light, opaque)
+    /// neighbour in the 4-connected source sheet — i.e. it's floating
+    /// outside the cat silhouette. Used to keep alert rays while dropping
+    /// the outline that hugs the body.
+    private static func isDetachedDark(sheet: NSBitmapImageRep, x: Int, y: Int) -> Bool {
+        let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        for (dx, dy) in offsets {
+            guard let neighbour = sheet.colorAt(x: x + dx, y: y + dy),
+                  neighbour.alphaComponent > 0
+            else { continue }
+            if !isDark(neighbour) { return false }
+        }
+        return true
     }
 
     /// Stamp a Z into the render context as a 2-pixel-stroke black letter.
     /// Because the final image is a template, AppKit flips black → white on
     /// dark menu bars automatically, so the Z stays legible everywhere.
     private static func drawStamp(_ stamp: ZStamp, into ctx: CGContext, pxScale: Int) {
-        ctx.setFillColor(CGColor(gray: 0, alpha: 1))
+        ctx.setFillColor(CGColor(gray: 0, alpha: 1.0))
         for (rowIdx, rowStr) in stamp.rows.enumerated() {
             for (colIdx, ch) in rowStr.enumerated() where ch == "#" {
                 let srcX = stamp.originX + colIdx
