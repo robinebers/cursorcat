@@ -1,5 +1,7 @@
 # CursorCat
 
+![CursorCat models view](./assets/readme/cursorcat-models.jpg)
+
 CursorCat is a tiny Mac app that lives in your menu bar and shows you how much you’re spending on Cursor today, with a little animated cat for company. No more popping open the Cursor website to check where you’re at, and a quick glance up at your menu bar tells you everything.
 
 Click the cat and a small window drops down showing:
