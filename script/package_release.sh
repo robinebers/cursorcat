@@ -36,6 +36,7 @@ RELEASE_IDENTITY=""
 SPARKLE_FRAMEWORK_SOURCE=""
 SETFILE_BIN=""
 REZ_BIN=""
+DEREZ_BIN=""
 
 usage() {
   echo "usage: $0 [app|notarize-app|dmg|release]" >&2
@@ -56,15 +57,16 @@ ensure_prerequisites() {
 }
 
 locate_icon_tools() {
-  if [ -n "$SETFILE_BIN" ] && [ -n "$REZ_BIN" ]; then
+  if [ -n "$SETFILE_BIN" ] && [ -n "$REZ_BIN" ] && [ -n "$DEREZ_BIN" ]; then
     return
   fi
 
   SETFILE_BIN="$(/usr/bin/xcrun --find SetFile 2>/dev/null || true)"
   REZ_BIN="$(/usr/bin/xcrun --find Rez 2>/dev/null || true)"
+  DEREZ_BIN="$(/usr/bin/xcrun --find DeRez 2>/dev/null || true)"
 
-  if [ -z "$SETFILE_BIN" ] || [ -z "$REZ_BIN" ]; then
-    echo "missing DMG icon tools; install Xcode command line support for SetFile and Rez" >&2
+  if [ -z "$SETFILE_BIN" ] || [ -z "$REZ_BIN" ] || [ -z "$DEREZ_BIN" ]; then
+    echo "missing DMG icon tools; install Xcode command line support for SetFile, Rez, and DeRez" >&2
     exit 1
   fi
 }
@@ -281,12 +283,14 @@ build_dmg() {
 
   local icon_resource_script
   icon_resource_script="$(mktemp "$DIST_DIR/dmg-icon.XXXXXX.r")"
-  cat >"$icon_resource_script" <<EOF
-read 'icns' (-16455) "$ICON_ICNS";
-EOF
+  local icon_resource_source
+  icon_resource_source="$(mktemp "$DIST_DIR/dmg-icon-source.XXXXXX.icns")"
+  cp "$ICON_ICNS" "$icon_resource_source"
+  /usr/bin/sips -i "$icon_resource_source" >/dev/null
+  "$DEREZ_BIN" -only icns "$icon_resource_source" >"$icon_resource_script"
   "$REZ_BIN" -append "$icon_resource_script" -o "$DMG_PATH" >/dev/null
   "$SETFILE_BIN" -a C "$DMG_PATH"
-  rm -f "$icon_resource_script"
+  rm -f "$icon_resource_script" "$icon_resource_source"
 
   /usr/bin/codesign \
     --force \
