@@ -30,6 +30,32 @@ struct DashboardContent: View {
             Divider()
             DashboardFooter(plan: snapshot.plan, scheduler: scheduler, refresh: actions.refresh)
         }
+        .background(
+            DashboardKeyboardShortcuts(
+                previousTab: cycleTab(by: -1),
+                nextTab: cycleTab(by: 1),
+                previousRange: cycleRange(by: -1),
+                nextRange: cycleRange(by: 1)
+            )
+        )
+    }
+
+    private func cycleTab(by delta: Int) -> () -> Void {
+        {
+            let tabs = DashboardTab.allCases
+            guard let currentIndex = tabs.firstIndex(of: selectedTab) else { return }
+            let nextIndex = (currentIndex + delta + tabs.count) % tabs.count
+            selectedTab = tabs[nextIndex]
+        }
+    }
+
+    private func cycleRange(by delta: Int) -> () -> Void {
+        {
+            let ranges = DashboardRange.allCases
+            guard let currentIndex = ranges.firstIndex(of: selectedRange) else { return }
+            let nextIndex = (currentIndex + delta + ranges.count) % ranges.count
+            selectedRange = ranges[nextIndex]
+        }
     }
 }
 
@@ -187,5 +213,30 @@ private struct DashboardTabSwitcher: View {
         .pickerStyle(.segmented)
         .labelsHidden()
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct DashboardKeyboardShortcuts: View {
+    let previousTab: () -> Void
+    let nextTab: () -> Void
+    let previousRange: () -> Void
+    let nextRange: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: previousTab) { EmptyView() }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+            Button(action: nextTab) { EmptyView() }
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+            Button(action: previousRange) { EmptyView() }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+            Button(action: nextRange) { EmptyView() }
+                .keyboardShortcut(.downArrow, modifiers: .command)
+        }
+        .buttonStyle(.plain)
+        .labelsHidden()
+        .frame(width: 0, height: 0)
+        .clipped()
+        .accessibilityHidden(true)
     }
 }
