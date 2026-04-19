@@ -1,4 +1,4 @@
-# CursorCat
+# CursorCat 🐈‍⬛
 
 ![CursorCat models view](./assets/readme/cursorcat-models.jpg)
 
