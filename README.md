@@ -16,6 +16,15 @@ The cat itself reacts to what you’re doing. When you’re busy using Cursor, i
 
 Anyone who uses Cursor and would rather not log into a dashboard just to check their usage. If you’ve ever wondered "wait, how much have I spent today?", this is for you.
 
+## Important Notes
+
+A few things to keep in mind before you rely on this:
+
+- There are zero guarantees for any of the data you see here. Treat it as a friendly hint, not a source of truth.
+- I built this for myself and I’m sharing it with the world for free. Take it or leave it — there’s no support promised.
+- It’s reverse-engineered from what Cursor’s own app and website do, so it may break at any time when Cursor changes something on their end.
+- Any numbers, calculations, or totals are best effort only. If you need an exact figure, check the official Cursor dashboard.
+
 ## Requirements
 
 - A Mac running macOS 26 (Tahoe) or newer
