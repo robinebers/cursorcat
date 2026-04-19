@@ -21,9 +21,6 @@ enum CatState: Equatable {
 enum CatRenderer {
     /// Source sheet layout: 8 columns × 4 rows of 32×32 sprites.
     private static let cell = 32
-    private static let sheetCols = 8
-    private static let sheetRows = 4
-
     /// Point size used in the menu bar (scaled 1:1 from 32×32 px).
     static let imageSize = NSSize(width: 22, height: 22)
 

@@ -10,20 +10,16 @@ final class PollScheduler {
 
     private let api: CursorAPI
     private let store: UsageStore
-    private let auth: CursorAuth
 
     private var timer: DispatchSourceTimer?
     private var isRefreshing = false
     private var consecutiveFailures = 0
     private var wakeWorkItem: DispatchWorkItem?
 
-    init(api: CursorAPI, store: UsageStore, auth: CursorAuth) {
+    init(api: CursorAPI, store: UsageStore) {
         self.api = api
         self.store = store
-        self.auth = auth
     }
-
-    var onSnapshotUpdate: (() -> Void)?
 
     func start() {
         scheduleTimer(interval: normalInterval)
@@ -62,10 +58,6 @@ final class PollScheduler {
     }
 
     private func runOnce() async {
-        if store.isScreenshotMode {
-            Log.poll.info("poll skipped: screenshot mode")
-            return
-        }
         if isRefreshing {
             Log.poll.info("poll skipped: already refreshing")
             return
@@ -81,18 +73,15 @@ final class PollScheduler {
             scheduleTimer(interval: normalInterval)
             Log.poll.info("poll ok")
             let derived = store.snapshot
-            FileLog.shared.write("poll ok: today=\(derived.todaySpend ?? -1) yesterday=\(derived.yesterdaySpend ?? -1) last7=\(derived.last7DaysSpend ?? -1) cycle=\(derived.billingCycleSpend ?? -1) plan=\(derived.plan ?? "?") csvRows=\(snapshot.csvRows.count)", category: "poll")
+            FileLog.shared.write("poll ok: today=\(derived.todaySpend ?? -1) yesterday=\(derived.yesterdaySpend ?? -1) cycle=\(derived.billingCycleSpend ?? -1) plan=\(derived.plan ?? "?") csvRows=\(snapshot.csvRows.count)", category: "poll")
             let dump = await api.collectRawDump()
             FileLog.shared.write(dump, category: "raw")
-            onSnapshotUpdate?()
         } catch let err as CursorAuthError where err.shouldLogOut {
             Log.poll.error("poll logged-out: \(err.description)")
             store.setLoggedOut()
-            onSnapshotUpdate?()
         } catch let err as HTTPError where err.isAuth {
             Log.poll.error("poll auth error: \(err.description)")
             store.setLoggedOut()
-            onSnapshotUpdate?()
         } catch {
             consecutiveFailures += 1
             let msg = "Last update failed \(hhmm(Date()))"
@@ -102,7 +91,6 @@ final class PollScheduler {
             if consecutiveFailures >= 3 {
                 scheduleTimer(interval: backoffInterval)
             }
-            onSnapshotUpdate?()
         }
     }
 

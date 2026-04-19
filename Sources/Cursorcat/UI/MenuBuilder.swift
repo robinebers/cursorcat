@@ -1,16 +1,34 @@
 import AppKit
 
-/// Builds the small actions-only `NSMenu` surfaced by right-clicking the
-/// status item. Data rows live in the popover dashboard; this menu only
-/// carries actions the user might want to invoke without opening the
-/// popover (Interact submenu, Refresh, Open Cursor, Quit).
-/// Which entry in the Screenshot Mode submenu currently carries the
-/// checkmark. `off` means the popover is showing real data from the
-/// scheduler; the other two correspond to the loaded fixture.
-enum ScreenshotMenuState {
-    case off
-    case positive
-    case negative
+enum InteractionMenuAction: Int, CaseIterable {
+    case scratchHead
+    case scratchUp
+    case scratchDown
+    case sleep
+    case alert
+    case runAround
+
+    var title: String {
+        switch self {
+        case .scratchHead: return "Scratch head"
+        case .scratchUp: return "Scratch up"
+        case .scratchDown: return "Scratch down"
+        case .sleep: return "Sleep"
+        case .alert: return "Alert"
+        case .runAround: return "Run around"
+        }
+    }
+
+    var animation: CatAnimation {
+        switch self {
+        case .scratchHead: return .scratchHead
+        case .scratchUp: return .scratchUp
+        case .scratchDown: return .scratchDown
+        case .sleep: return .sleeping
+        case .alert: return .alert
+        case .runAround: return .runAround
+        }
+    }
 }
 
 @MainActor
@@ -22,7 +40,6 @@ final class ActionsMenuBuilder {
     let openStatusSelector: Selector
     let quitSelector: Selector
     let interactSelector: Selector
-    let screenshotSelector: Selector
 
     init(target: AnyObject,
          refreshSelector: Selector,
@@ -30,8 +47,7 @@ final class ActionsMenuBuilder {
          openCloudAgentsSelector: Selector,
          openStatusSelector: Selector,
          quitSelector: Selector,
-         interactSelector: Selector,
-         screenshotSelector: Selector) {
+         interactSelector: Selector) {
         self.target = target
         self.refreshSelector = refreshSelector
         self.openCursorSelector = openCursorSelector
@@ -39,33 +55,9 @@ final class ActionsMenuBuilder {
         self.openStatusSelector = openStatusSelector
         self.quitSelector = quitSelector
         self.interactSelector = interactSelector
-        self.screenshotSelector = screenshotSelector
     }
 
-    /// Interact submenu entries. Tag on each item identifies the animation.
-    static let interactions: [(title: String, tag: Int)] = [
-        ("Scratch head", 0),
-        ("Scratch up", 4),
-        ("Scratch down", 5),
-        ("Sleep", 1),
-        ("Alert", 2),
-        ("Run around", 3)
-    ]
-
-    static func animation(forTag tag: Int) -> CatAnimation? {
-        switch tag {
-        case 0: return .scratchHead
-        case 1: return .sleeping
-        case 2: return .alert
-        case 3: return .runAround
-        case 4: return .scratchUp
-        case 5: return .scratchDown
-        default: return nil
-        }
-    }
-
-    func build(isLoggedIn: Bool,
-               screenshotState: ScreenshotMenuState = .off) -> NSMenu {
+    func build(isLoggedIn: Bool) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
@@ -106,10 +98,6 @@ final class ActionsMenuBuilder {
 
         menu.addItem(.separator())
 
-        menu.addItem(makeScreenshotItem(state: screenshotState))
-
-        menu.addItem(.separator())
-
         let quit = NSMenuItem(title: "Quit Cursorcat",
                               action: quitSelector,
                               keyEquivalent: "q")
@@ -122,43 +110,14 @@ final class ActionsMenuBuilder {
     private func makeInteractItem() -> NSMenuItem {
         let parent = NSMenuItem(title: "Interact", action: nil, keyEquivalent: "")
         let sub = NSMenu(title: "Interact")
-        for entry in Self.interactions {
+        for entry in InteractionMenuAction.allCases {
             let item = NSMenuItem(title: entry.title,
                                   action: interactSelector,
                                   keyEquivalent: "")
             item.target = target
-            item.tag = entry.tag
+            item.tag = entry.rawValue
             sub.addItem(item)
         }
-        parent.submenu = sub
-        return parent
-    }
-
-    private func makeScreenshotItem(state: ScreenshotMenuState) -> NSMenuItem {
-        let parent = NSMenuItem(title: "Screenshot Mode",
-                                action: nil,
-                                keyEquivalent: "")
-        parent.image = NSImage(systemSymbolName: "camera",
-                               accessibilityDescription: nil)
-
-        let sub = NSMenu(title: "Screenshot Mode")
-
-        let entries: [(title: String, tag: Int, matches: ScreenshotMenuState)] = [
-            ("Turn off", 0, .off),
-            ("Positive data", 1, .positive),
-            ("Negative data", 2, .negative)
-        ]
-
-        for entry in entries {
-            let item = NSMenuItem(title: entry.title,
-                                  action: screenshotSelector,
-                                  keyEquivalent: "")
-            item.target = target
-            item.tag = entry.tag
-            item.state = (state == entry.matches) ? .on : .off
-            sub.addItem(item)
-        }
-
         parent.submenu = sub
         return parent
     }

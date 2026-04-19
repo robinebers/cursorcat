@@ -71,7 +71,7 @@ struct QuotaRow: View {
                     .foregroundStyle(.secondary)
             }
             MonoBar(fraction: fraction)
-                .frame(height: 5)
+                .frame(height: 7)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label), \(value)")
@@ -115,12 +115,12 @@ struct PlanPill: View {
             .fontWeight(.semibold)
             .textCase(.uppercase)
             .tracking(0.5)
-            .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+            .foregroundStyle(.primary)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(
+            .overlay(
                 Capsule(style: .continuous)
-                    .fill(Color.primary)
+                    .stroke(.tertiary, lineWidth: 1)
             )
             .accessibilityLabel("Plan: \(plan)")
     }

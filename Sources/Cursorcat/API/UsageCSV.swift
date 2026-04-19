@@ -13,6 +13,12 @@ struct UsageCSVRow {
     var csvCost: String
 }
 
+extension TokenUsage {
+    var totalTokens: Int {
+        inputCacheWrite + inputNoCacheWrite + cacheRead + output
+    }
+}
+
 /// GET https://cursor.com/api/dashboard/export-usage-events-csv — Cookie auth.
 actor UsageCSVClient {
     static let exportURL = URL(string: "https://cursor.com/api/dashboard/export-usage-events-csv")!

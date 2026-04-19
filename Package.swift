@@ -19,6 +19,11 @@ let package = Package(
             linkerSettings: [
                 .linkedLibrary("sqlite3")
             ]
+        ),
+        .testTarget(
+            name: "CursorcatTests",
+            dependencies: ["Cursorcat"],
+            path: "Tests/CursorcatTests"
         )
     ]
 )

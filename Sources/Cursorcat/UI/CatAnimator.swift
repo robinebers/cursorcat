@@ -59,7 +59,6 @@ final class CatAnimator {
 
     private var timer: Timer?
     private var state: CatState = .idle
-    private var idleTime = 0
     private var animation: CatAnimation?
     private var animationFrame = 0
     private var breathTick = 0
@@ -81,7 +80,6 @@ final class CatAnimator {
     func setState(_ newState: CatState) {
         guard state != newState else { return }
         state = newState
-        idleTime = 0
         animation = nil
         animationFrame = 0
         emit()
@@ -93,7 +91,6 @@ final class CatAnimator {
         state = .idle
         animation = kind
         animationFrame = 0
-        idleTime = 0
         advance()
     }
 
@@ -111,7 +108,6 @@ final class CatAnimator {
     private func tick() {
         // Pose-locked states don't animate.
         guard state == .idle else { return }
-        idleTime += 1
         advance()
     }
 

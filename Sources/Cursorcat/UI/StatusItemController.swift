@@ -12,100 +12,94 @@ final class StatusItemController: NSObject {
     private let store: UsageStore
     private let animator: CatAnimator
     private let scheduler: PollScheduler
-    private let menuBuilder: ActionsMenuBuilder
     private let popover: NSPopover
-    private let behavior: CatBehavior
-    private let screenshotDirector: ScreenshotDirector
     private var cancellables: Set<AnyCancellable> = []
-    private var activeFixture: ScreenshotFixture?
+    private lazy var menuBuilder = ActionsMenuBuilder(
+        target: self,
+        refreshSelector: #selector(refreshNow),
+        openCursorSelector: #selector(openCursor),
+        openCloudAgentsSelector: #selector(openCloudAgents),
+        openStatusSelector: #selector(openStatus),
+        quitSelector: #selector(quit),
+        interactSelector: #selector(performInteraction(_:))
+    )
 
     init(store: UsageStore,
          animator: CatAnimator,
-         scheduler: PollScheduler,
-         behavior: CatBehavior) {
+         scheduler: PollScheduler) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.store = store
         self.animator = animator
         self.scheduler = scheduler
-        self.behavior = behavior
-        self.screenshotDirector = ScreenshotDirector(animator: animator)
-        let builder = ActionsMenuBuilder(
-            target: StatusItemController.self as AnyObject, // placeholder
-            refreshSelector: #selector(StatusItemController.refreshNow),
-            openCursorSelector: #selector(StatusItemController.openCursor),
-            openCloudAgentsSelector: #selector(StatusItemController.openCloudAgents),
-            openStatusSelector: #selector(StatusItemController.openStatus),
-            quitSelector: #selector(StatusItemController.quit),
-            interactSelector: #selector(StatusItemController.performInteraction(_:)),
-            screenshotSelector: #selector(StatusItemController.screenshotModeChanged(_:))
-        )
-        self.menuBuilder = builder
         self.popover = NSPopover()
         super.init()
-        builder.target = self
 
-        let actions = DashboardActions(
+        configurePopover()
+        configureStatusButton()
+        animator.onFrame = { [weak self] image in
+            self?.statusItem.button?.image = image
+        }
+        animator.start()
+        observeStore()
+    }
+
+    private func configurePopover() {
+        popover.behavior = .transient
+        popover.animates = true
+        popover.contentViewController = NSHostingController(
+            rootView: DashboardView(store: store, actions: makeDashboardActions())
+        )
+    }
+
+    private func configureStatusButton() {
+        statusItem.button?.title = " …"
+        statusItem.button?.imagePosition = .imageLeft
+        guard let button = statusItem.button else { return }
+        button.action = #selector(handleStatusButton(_:))
+        button.target = self
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+
+    private func observeStore() {
+        store.$snapshot
+            .combineLatest(store.$viewState)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] snapshot, viewState in
+                self?.renderStatusItem(snapshot: snapshot, viewState: viewState)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func makeDashboardActions() -> DashboardActions {
+        DashboardActions(
             refresh: { [weak self] in
                 self?.scheduler.triggerNow()
             },
             openCursor: { [weak self] in
                 self?.openCursorAndDismiss()
             },
-            interact: { [weak self] anim in
-                self?.animator.play(anim)
-                self?.popover.performClose(nil)
-            },
             quit: {
                 NSApplication.shared.terminate(nil)
             }
         )
-        popover.behavior = .transient
-        popover.animates = true
-        popover.contentViewController = NSHostingController(
-            rootView: DashboardView(store: store, actions: actions)
-        )
-
-        statusItem.button?.title = " …"
-        statusItem.button?.imagePosition = .imageLeft
-        if let button = statusItem.button {
-            button.action = #selector(handleStatusButton(_:))
-            button.target = self
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        }
-
-        animator.onFrame = { [weak self] image in
-            self?.statusItem.button?.image = image
-        }
-        animator.start()
-
-        store.$snapshot
-            .receive(on: RunLoop.main)
-            .sink { [weak self] snap in self?.applySnapshot(snap) }
-            .store(in: &cancellables)
     }
 
-    private func applySnapshot(_ snapshot: UsageSnapshot) {
-        if !snapshot.isLoggedIn {
+    private func renderStatusItem(snapshot: UsageSnapshot, viewState: UsageViewState) {
+        switch viewState {
+        case .loggedOut:
             animator.setState(.sleeping)
             statusItem.button?.title = " Not logged in"
-            return
-        }
-
-        if snapshot.todaySpend == nil && snapshot.lastUpdated == nil {
+        case .loading:
             animator.setState(.idle)
             statusItem.button?.title = " …"
-            return
-        }
-
-        if snapshot.todaySpend == nil && snapshot.lastError != nil {
+        case .failed:
             animator.setState(.error)
             statusItem.button?.title = " ⚠"
-            return
+        case .loaded:
+            animator.setState(.idle)
+            let spend = snapshot.todaySpend ?? 0
+            statusItem.button?.title = " \(Money.format(cents: spend))"
         }
-
-        animator.setState(.idle)
-        let spend = snapshot.todaySpend ?? 0
-        statusItem.button?.title = " \(Money.format(cents: spend))"
     }
 
     // MARK: - Click handling
@@ -146,22 +140,10 @@ final class StatusItemController: NSObject {
         if popover.isShown {
             popover.performClose(nil)
         }
-        let menu = menuBuilder.build(
-            isLoggedIn: store.snapshot.isLoggedIn,
-            screenshotState: screenshotMenuState
-        )
+        let menu = menuBuilder.build(isLoggedIn: store.viewState != .loggedOut)
         statusItem.menu = menu
         button.performClick(nil)
         statusItem.menu = nil
-    }
-
-    private var screenshotMenuState: ScreenshotMenuState {
-        guard store.isScreenshotMode else { return .off }
-        switch activeFixture {
-        case .positive: return .positive
-        case .negative: return .negative
-        case nil: return .off
-        }
     }
 
     // MARK: - Actions
@@ -207,37 +189,7 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func performInteraction(_ sender: NSMenuItem) {
-        guard let animation = ActionsMenuBuilder.animation(forTag: sender.tag) else { return }
-        animator.play(animation)
-    }
-
-    @objc private func screenshotModeChanged(_ sender: NSMenuItem) {
-        switch sender.tag {
-        case 1:
-            activeFixture = .positive
-            enterScreenshotMode(.positive)
-        case 2:
-            activeFixture = .negative
-            enterScreenshotMode(.negative)
-        default:
-            activeFixture = nil
-            exitScreenshotMode()
-        }
-    }
-
-    private func enterScreenshotMode(_ fixture: ScreenshotFixture) {
-        store.applyFixture(fixture)
-        // Pause the snapshot-driven phase machine so only the director is
-        // firing animations — otherwise the two can collide on the same
-        // `animator.play(_:)` call.
-        behavior.stop()
-        screenshotDirector.start()
-    }
-
-    private func exitScreenshotMode() {
-        screenshotDirector.stop()
-        behavior.start()
-        store.exitScreenshotMode()
-        scheduler.triggerNow()
+        guard let action = InteractionMenuAction(rawValue: sender.tag) else { return }
+        animator.play(action.animation)
     }
 }

@@ -11,10 +11,6 @@ struct APISnapshot {
     var csvStart: Date
     var csvEnd: Date
 
-    static let empty = APISnapshot(
-        usage: nil, plan: nil, credits: nil, csvRows: [],
-        stripeBalanceCents: 0, csvStart: Date(), csvEnd: Date()
-    )
 }
 
 /// Orchestrates one fan-out poll: RPC trio + CSV + Stripe.
@@ -24,7 +20,6 @@ actor CursorAPI {
     private let rpc: DashboardRPC
     private let csv: UsageCSVClient
     private let stripe: StripeAPI
-    private(set) var lastRawDump: String = ""
 
     init(auth: CursorAuth,
          rpc: DashboardRPC = DashboardRPC(),
@@ -35,8 +30,6 @@ actor CursorAPI {
         self.csv = csv
         self.stripe = stripe
     }
-
-    func storeLastDump(_ dump: String) { self.lastRawDump = dump }
 
     func collectRawDump() async -> String {
         let rpcRaw = await rpc.snapshotRaw()

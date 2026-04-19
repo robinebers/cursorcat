@@ -5,23 +5,40 @@ MODE="${1:-run}"
 APP_NAME="Cursorcat"
 BUNDLE_ID="com.sunstory.cursorcat"
 MIN_SYSTEM_VERSION="26.0"
+APP_VERSION="0.1.0"
+APP_BUILD="1"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
+APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
+RESOURCE_BUNDLE_NAME="${APP_NAME}_${APP_NAME}.bundle"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
 swift build
-BUILD_BINARY="$(swift build --show-bin-path)/$APP_NAME"
+BUILD_DIR="$(swift build --show-bin-path)"
+BUILD_BINARY="$BUILD_DIR/$APP_NAME"
+RESOURCE_BUNDLE="$BUILD_DIR/$RESOURCE_BUNDLE_NAME"
+
+if [ ! -x "$BUILD_BINARY" ]; then
+  echo "missing built binary: $BUILD_BINARY" >&2
+  exit 1
+fi
+
+if [ ! -d "$RESOURCE_BUNDLE" ]; then
+  echo "missing SwiftPM resource bundle: $RESOURCE_BUNDLE" >&2
+  exit 1
+fi
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_MACOS"
+mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
+cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME"
 chmod +x "$APP_BINARY"
 
 cat >"$INFO_PLIST" <<PLIST
@@ -37,10 +54,12 @@ cat >"$INFO_PLIST" <<PLIST
   <string>$APP_NAME</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>CFBundleDisplayName</key>
+  <string>$APP_NAME</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>$APP_VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$APP_BUILD</string>
   <key>LSMinimumSystemVersion</key>
   <string>$MIN_SYSTEM_VERSION</string>
   <key>LSUIElement</key>
@@ -70,7 +89,7 @@ if [ -z "$CODESIGN_IDENTITY" ]; then
     | /usr/bin/awk -F\" '/Apple Development:/ { print $2; exit }')
 fi
 
-ENTITLEMENTS="$ROOT_DIR/script/Cursorcat.entitlements.plist"
+ENTITLEMENTS="$ROOT_DIR/script/Cursorcat.dev.entitlements.plist"
 
 if [ -n "$CODESIGN_IDENTITY" ]; then
   /usr/bin/codesign \
