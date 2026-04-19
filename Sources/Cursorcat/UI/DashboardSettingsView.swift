@@ -7,7 +7,7 @@ struct DashboardSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Global trigger shortcut")
                     .font(.callout)
                     .fontWeight(.semibold)
@@ -17,21 +17,27 @@ struct DashboardSettingsView: View {
                 Text("Toggles the popover from anywhere.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Divider()
 
-            Toggle(isOn: rawCostBinding) {
+            HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Use raw API cost")
                         .font(.callout)
                         .fontWeight(.semibold)
-                    Text("Off uses actual charged cost and ignores included or free usage.")
+                    Text("Ignores included and free usage credits.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Toggle("", isOn: rawCostBinding)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
             }
-            .toggleStyle(.switch)
         }
     }
 
@@ -50,46 +56,76 @@ private struct ShortcutRecorder: View {
     @State private var eventMonitor: Any?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Text(shortcutLabel)
-                    .font(.system(.body, design: .rounded))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(.quaternary)
-                    )
-
-                Button(isRecording ? "Cancel" : recordButtonTitle) {
-                    isRecording ? stopRecording() : startRecording()
+        Button(action: toggleRecording) {
+            HStack(spacing: 8) {
+                chipContent
+                Spacer(minLength: 0)
+                if !isRecording, settings.globalShortcut != nil {
+                    Button(action: clear) {
+                        Image(systemName: "xmark.circle.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.secondary)
+                            .imageScale(.medium)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear shortcut")
+                    .accessibilityLabel("Clear shortcut")
                 }
-                .controlSize(.small)
             }
-
-            if settings.globalShortcut != nil {
-                Button("Clear Shortcut") {
-                    settings.globalShortcut = nil
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(.quinary)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(borderColor, lineWidth: isRecording ? 1.5 : 1)
+            )
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .onDisappear {
             stopRecording()
         }
     }
 
-    private var shortcutLabel: String {
+    @ViewBuilder
+    private var chipContent: some View {
         if isRecording {
-            return "Press shortcut..."
+            Text("Type shortcut\u{2026}")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        } else if let shortcut = settings.globalShortcut {
+            Text(shortcut.displayString)
+                .font(.system(.callout, design: .monospaced))
+                .foregroundStyle(.primary)
+        } else {
+            HStack(spacing: 6) {
+                Image(systemName: "keyboard")
+                    .foregroundStyle(.secondary)
+                Text("Record Shortcut")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
         }
-        return settings.globalShortcut?.displayString ?? "Not set"
     }
 
-    private var recordButtonTitle: String {
-        settings.globalShortcut == nil ? "Record" : "Change"
+    private var borderColor: Color {
+        isRecording ? Color.accentColor : Color(nsColor: .separatorColor)
+    }
+
+    private func toggleRecording() {
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
+        }
+    }
+
+    private func clear() {
+        settings.globalShortcut = nil
     }
 
     private func startRecording() {

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct DashboardContent: View {
@@ -205,14 +206,67 @@ private struct DashboardTabSwitcher: View {
     @Binding var selectedTab: DashboardTab
 
     var body: some View {
-        Picker("Tab", selection: $selectedTab) {
-            ForEach(DashboardTab.allCases) { tab in
-                Text(tab.title).tag(tab)
+        SegmentedTabBar(
+            tabs: DashboardTab.allCases,
+            selection: $selectedTab,
+            title: { $0.title }
+        )
+    }
+}
+
+private struct SegmentedTabBar<Tab: Hashable>: NSViewRepresentable {
+    let tabs: [Tab]
+    @Binding var selection: Tab
+    let title: (Tab) -> String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl(
+            labels: tabs.map(title),
+            trackingMode: .selectOne,
+            target: context.coordinator,
+            action: #selector(Coordinator.segmentChanged(_:))
+        )
+        control.segmentStyle = .texturedSquare
+        control.segmentDistribution = .fillEqually
+        control.controlSize = .regular
+        control.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return control
+    }
+
+    func updateNSView(_ nsView: NSSegmentedControl, context: Context) {
+        context.coordinator.parent = self
+        if nsView.segmentCount != tabs.count {
+            nsView.segmentCount = tabs.count
+        }
+        for (index, tab) in tabs.enumerated() where nsView.label(forSegment: index) != title(tab) {
+            nsView.setLabel(title(tab), forSegment: index)
+        }
+        if let index = tabs.firstIndex(of: selection), nsView.selectedSegment != index {
+            nsView.selectedSegment = index
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var parent: SegmentedTabBar
+
+        init(_ parent: SegmentedTabBar) {
+            self.parent = parent
+        }
+
+        @objc func segmentChanged(_ sender: NSSegmentedControl) {
+            let index = sender.selectedSegment
+            guard parent.tabs.indices.contains(index) else { return }
+            let tab = parent.tabs[index]
+            if parent.selection != tab {
+                parent.selection = tab
             }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(maxWidth: .infinity)
     }
 }
 
