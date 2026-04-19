@@ -29,11 +29,22 @@ private struct ModelBreakdownListRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Text(row.displayName)
-                .font(.callout)
-                .fontWeight(.semibold)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(row.displayName)
+                    .font(.callout)
+                    .fontWeight(.semibold)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if row.isUnpriced {
+                    Image(systemName: "exclamationmark.triangle")
+                        .imageScale(.small)
+                        .foregroundStyle(.secondary)
+                        .help("No model pricing available")
+                        .accessibilityLabel("No model pricing available")
+                }
+            }
+            .help(primaryTooltipText)
 
             Spacer(minLength: 8)
 
@@ -48,8 +59,8 @@ private struct ModelBreakdownListRow: View {
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
+            .help(primaryTooltipText)
         }
-        .help(tooltipText)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(row.displayName), \(costAccessibilityLabel), \(tokenAccessibilityLabel)")
     }
@@ -70,7 +81,7 @@ private struct ModelBreakdownListRow: View {
         "\(row.totalTokens) tokens"
     }
 
-    private var tooltipText: String {
+    private var primaryTooltipText: String {
         row.variants
             .map { variant in
                 "\(variant.model) - \(variantCostLabel(for: variant))"

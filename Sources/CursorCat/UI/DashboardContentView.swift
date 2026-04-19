@@ -5,6 +5,7 @@ struct DashboardContent: View {
     let snapshot: UsageSnapshot
     @ObservedObject var settings: UserSettings
     @ObservedObject var scheduler: PollScheduler
+    @ObservedObject var updater: AppUpdater
     let actions: DashboardActions
 
     @State private var selectedTab: DashboardTab = .overview
@@ -26,6 +27,10 @@ struct DashboardContent: View {
                 DashboardModelsView(rows: snapshot.modelBreakdowns[selectedRange] ?? [])
             case .settings:
                 DashboardSettingsView(settings: settings)
+            }
+
+            if updater.installState.isPending {
+                UpdateInstallButton(state: updater.installState, install: actions.installUpdate)
             }
 
             Divider()
@@ -57,6 +62,29 @@ struct DashboardContent: View {
             let nextIndex = (currentIndex + delta + ranges.count) % ranges.count
             selectedRange = ranges[nextIndex]
         }
+    }
+}
+
+private struct UpdateInstallButton: View {
+    let state: AppUpdater.InstallState
+    let install: () -> Void
+
+    var body: some View {
+        Button(action: install) {
+            HStack(spacing: 8) {
+                if state.isBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(state.buttonTitle)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .buttonStyle(.glassProminent)
+        .controlSize(.large)
+        .frame(maxWidth: .infinity)
+        .disabled(!state.isInstallEnabled)
+        .accessibilityLabel(state.buttonTitle)
     }
 }
 

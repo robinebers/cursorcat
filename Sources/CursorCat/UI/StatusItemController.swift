@@ -17,9 +17,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let popover: NSPopover
     private var eventMonitor: EventMonitor?
     private var cancellables: Set<AnyCancellable> = []
+    private var latestSnapshot: UsageSnapshot = .loading
+    private var latestViewState: UsageViewState = .loading
     private lazy var menuBuilder = ActionsMenuBuilder(
         target: self,
-        refreshSelector: #selector(refreshNow),
         checkForUpdatesSelector: #selector(checkForUpdates),
         aboutSelector: #selector(showAbout),
         openCursorSelector: #selector(openCursor),
@@ -61,6 +62,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
                 store: store,
                 settings: settings,
                 scheduler: scheduler,
+                updater: updater,
                 actions: makeDashboardActions()
             )
         )
@@ -80,7 +82,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             .combineLatest(store.$viewState)
             .receive(on: RunLoop.main)
             .sink { [weak self] snapshot, viewState in
+                self?.latestSnapshot = snapshot
+                self?.latestViewState = viewState
                 self?.renderStatusItem(snapshot: snapshot, viewState: viewState)
+            }
+            .store(in: &cancellables)
+
+        updater.$installState
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.renderStatusItem(snapshot: self.latestSnapshot, viewState: self.latestViewState)
             }
             .store(in: &cancellables)
     }
@@ -92,6 +104,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             },
             openCursor: { [weak self] in
                 self?.openCursorAndDismiss()
+            },
+            installUpdate: { [weak self] in
+                self?.updater.installUpdate()
             }
         )
     }
@@ -102,13 +117,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             animator.setState(.sleeping)
             statusItem.button?.title = " Not logged in"
         case .loading:
-            animator.setState(.idle)
+            animator.setState(updater.shouldShowAlertCat ? .alert : .idle)
             statusItem.button?.title = " …"
         case .failed:
             animator.setState(.error)
             statusItem.button?.title = " ⚠"
         case .loaded:
-            animator.setState(.idle)
+            animator.setState(updater.shouldShowAlertCat ? .alert : .idle)
             let spend = snapshot.todaySpend ?? 0
             statusItem.button?.title = " \(Money.format(cents: spend))"
         }
@@ -168,10 +183,6 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     // MARK: - Actions
-
-    @objc private func refreshNow() {
-        scheduler.triggerNow(manual: true)
-    }
 
     @objc private func checkForUpdates() {
         updater.checkForUpdates()

@@ -9,7 +9,7 @@ APP_VERSION="${APP_VERSION:-0.1.0}"
 APP_BUILD="${APP_BUILD:-$APP_VERSION}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-notarytool-profile}"
 RESOURCE_BUNDLE_NAME="${APP_NAME}_${APP_NAME}.bundle"
-DEFAULT_SPARKLE_FEED_URL="https://robinebers.github.io/cursorcat/appcast.xml"
+DEFAULT_SPARKLE_FEED_URL="https://github.com/robinebers/cursorcat/releases/latest/download/appcast.xml"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ICON_ICNS="$ROOT_DIR/Resources/AppIcon/AppIcon.icns"
@@ -34,6 +34,8 @@ BUILD_BINARY=""
 RESOURCE_BUNDLE=""
 RELEASE_IDENTITY=""
 SPARKLE_FRAMEWORK_SOURCE=""
+SETFILE_BIN=""
+REZ_BIN=""
 
 usage() {
   echo "usage: $0 [app|notarize-app|dmg|release]" >&2
@@ -53,6 +55,20 @@ ensure_prerequisites() {
   ensure_tool /usr/libexec/PlistBuddy
 }
 
+locate_icon_tools() {
+  if [ -n "$SETFILE_BIN" ] && [ -n "$REZ_BIN" ]; then
+    return
+  fi
+
+  SETFILE_BIN="$(/usr/bin/xcrun --find SetFile 2>/dev/null || true)"
+  REZ_BIN="$(/usr/bin/xcrun --find Rez 2>/dev/null || true)"
+
+  if [ -z "$SETFILE_BIN" ] || [ -z "$REZ_BIN" ]; then
+    echo "missing DMG icon tools; install Xcode command line support for SetFile and Rez" >&2
+    exit 1
+  fi
+}
+
 ensure_release_identity() {
   if [ -n "${RELEASE_IDENTITY:-}" ]; then
     return
@@ -60,7 +76,12 @@ ensure_release_identity() {
 
   RELEASE_IDENTITY="${CODESIGN_IDENTITY:-}"
   if [ -z "$RELEASE_IDENTITY" ]; then
-    echo "missing Developer ID Application signing identity; set CODESIGN_IDENTITY" >&2
+    RELEASE_IDENTITY=$(/usr/bin/security find-identity -p codesigning -v 2>/dev/null \
+      | /usr/bin/awk -F\" '/Developer ID Application:/ { print $2; exit }')
+  fi
+
+  if [ -z "$RELEASE_IDENTITY" ]; then
+    echo "missing Developer ID Application signing identity; install one or set CODESIGN_IDENTITY" >&2
     exit 1
   fi
 }
@@ -160,8 +181,12 @@ write_info_plist() {
   <string>$SPARKLE_PUBLIC_ED_KEY</string>
   <key>SUEnableAutomaticChecks</key>
   <true/>
+  <key>SUScheduledCheckInterval</key>
+  <integer>3600</integer>
+  <key>SUAutomaticallyUpdate</key>
+  <true/>
   <key>SUAllowsAutomaticUpdates</key>
-  <false/>
+  <true/>
 </dict>
 </plist>
 PLIST
@@ -236,12 +261,16 @@ build_dmg() {
   fi
 
   ensure_release_identity
+  locate_icon_tools
 
   rm -rf "$DMG_STAGING_DIR"
   rm -f "$DMG_PATH"
   mkdir -p "$DMG_STAGING_DIR"
   cp -R "$APP_BUNDLE" "$DMG_STAGING_DIR/"
   ln -s /Applications "$DMG_STAGING_DIR/Applications"
+  cp "$ICON_ICNS" "$DMG_STAGING_DIR/.VolumeIcon.icns"
+  "$SETFILE_BIN" -a C "$DMG_STAGING_DIR"
+  "$SETFILE_BIN" -a V "$DMG_STAGING_DIR/.VolumeIcon.icns"
 
   /usr/bin/hdiutil create \
     -volname "$APP_NAME" \
@@ -249,6 +278,15 @@ build_dmg() {
     -ov \
     -format UDZO \
     "$DMG_PATH"
+
+  local icon_resource_script
+  icon_resource_script="$(mktemp "$DIST_DIR/dmg-icon.XXXXXX.r")"
+  cat >"$icon_resource_script" <<EOF
+read 'icns' (-16455) "$ICON_ICNS";
+EOF
+  "$REZ_BIN" -append "$icon_resource_script" -o "$DMG_PATH" >/dev/null
+  "$SETFILE_BIN" -a C "$DMG_PATH"
+  rm -f "$icon_resource_script"
 
   /usr/bin/codesign \
     --force \

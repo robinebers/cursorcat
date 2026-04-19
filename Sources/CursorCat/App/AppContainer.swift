@@ -42,6 +42,7 @@ final class AppContainer {
     }
 
     func start() {
+        updater.start()
         behavior.start()
         scheduler.start()
     }

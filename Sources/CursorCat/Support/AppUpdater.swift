@@ -1,21 +1,79 @@
 import AppKit
-import Sparkle
+import Combine
+@preconcurrency import Sparkle
 
 @MainActor
-final class AppUpdater: NSObject {
-    private let updaterController: SPUStandardUpdaterController?
+final class AppUpdater: NSObject, ObservableObject {
+    enum InstallState: Equatable {
+        case idle
+        case available(version: String)
+        case downloading(version: String)
+        case ready(version: String)
+        case installing(version: String)
+
+        var version: String? {
+            switch self {
+            case .idle:
+                return nil
+            case .available(let version),
+                 .downloading(let version),
+                 .ready(let version),
+                 .installing(let version):
+                return version
+            }
+        }
+
+        var isPending: Bool {
+            self != .idle
+        }
+
+        var isBusy: Bool {
+            switch self {
+            case .downloading, .installing:
+                return true
+            case .idle, .available, .ready:
+                return false
+            }
+        }
+
+        var isInstallEnabled: Bool {
+            switch self {
+            case .available, .ready:
+                return true
+            case .idle, .downloading, .installing:
+                return false
+            }
+        }
+
+        var buttonTitle: String {
+            switch self {
+            case .idle, .available, .ready:
+                return "New version! Restart now."
+            case .downloading:
+                return "Downloading…"
+            case .installing:
+                return "Restarting…"
+            }
+        }
+    }
+
+    @Published private(set) var installState: InstallState = .idle
+
+    private var updaterController: SPUStandardUpdaterController?
+    private var startupCheckPerformed = false
+    private var pendingUpdateItem: SUAppcastItem?
+    private var immediateInstallBlock: (() -> Void)?
 
     override init() {
+        super.init()
+
         if AppMetadata.sparkleFeedURL != nil, AppMetadata.sparklePublicEDKey != nil {
             updaterController = SPUStandardUpdaterController(
-                startingUpdater: true,
-                updaterDelegate: nil,
-                userDriverDelegate: nil
+                startingUpdater: false,
+                updaterDelegate: self,
+                userDriverDelegate: self
             )
-        } else {
-            updaterController = nil
         }
-        super.init()
     }
 
     var canCheckForUpdates: Bool {
@@ -26,21 +84,208 @@ final class AppUpdater: NSObject {
         updaterController != nil
     }
 
+    var shouldShowAlertCat: Bool {
+        installState.isPending
+    }
+
+    func start() {
+        guard let updaterController else { return }
+        updaterController.startUpdater()
+
+        guard !startupCheckPerformed else { return }
+        startupCheckPerformed = true
+
+        if updaterController.updater.automaticallyChecksForUpdates {
+            updaterController.updater.checkForUpdatesInBackground()
+        }
+    }
+
     func checkForUpdates() {
         updaterController?.checkForUpdates(nil)
+    }
+
+    func installUpdate() {
+        guard let updaterController else { return }
+
+        switch installState {
+        case .idle:
+            return
+        case .available(let version):
+            installState = .downloading(version: version)
+            if !updaterController.updater.sessionInProgress,
+               updaterController.updater.automaticallyChecksForUpdates {
+                updaterController.updater.checkForUpdatesInBackground()
+            }
+        case .downloading:
+            return
+        case .ready(let version):
+            installState = .installing(version: version)
+            immediateInstallBlock?()
+        case .installing:
+            return
+        }
     }
 
     func showAboutPanel() {
         let alert = NSAlert()
         alert.messageText = "About \(AppMetadata.displayName)"
 
+        let credit = "Made by Robin Ebers"
         if isConfigured {
-            alert.informativeText = "Version \(AppMetadata.versionDescription)"
+            alert.informativeText = "Version \(AppMetadata.versionDescription)\n\(credit)"
         } else {
-            alert.informativeText = "Version \(AppMetadata.versionDescription)\nAutomatic updates are not configured for this build."
+            alert.informativeText = "Version \(AppMetadata.versionDescription)\n\(credit)\nAutomatic updates are not configured for this build."
         }
 
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+}
+
+@MainActor
+extension AppUpdater: SPUUpdaterDelegate {
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        let version = versionString(for: item)
+        pendingUpdateItem = item
+        immediateInstallBlock = nil
+
+        switch installState {
+        case .idle:
+            installState = .available(version: version)
+        case .available, .downloading, .ready, .installing:
+            break
+        }
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        if pendingUpdateItem == nil {
+            installState = .idle
+        }
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: Error) {
+        if pendingUpdateItem == nil {
+            installState = .idle
+        }
+    }
+
+    func updater(_ updater: SPUUpdater, didDownloadUpdate item: SUAppcastItem) {
+        let version = versionString(for: item)
+        pendingUpdateItem = item
+        installState = .downloading(version: version)
+    }
+
+    func updater(_ updater: SPUUpdater, willExtractUpdate item: SUAppcastItem) {
+        let version = versionString(for: item)
+        pendingUpdateItem = item
+        installState = .downloading(version: version)
+    }
+
+    func updater(_ updater: SPUUpdater, didExtractUpdate item: SUAppcastItem) {
+        let version = versionString(for: item)
+        pendingUpdateItem = item
+        installState = .downloading(version: version)
+    }
+
+    func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
+        let version = versionString(for: item)
+        pendingUpdateItem = item
+        installState = .installing(version: version)
+    }
+
+    func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: Error) {
+        let version = versionString(for: item)
+        pendingUpdateItem = item
+        installState = .available(version: version)
+    }
+
+    func userDidCancelDownload(_ updater: SPUUpdater) {
+        restorePendingState()
+    }
+
+    func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
+        restorePendingState()
+    }
+
+    func updater(_ updater: SPUUpdater,
+                 didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
+                 error: Error?) {
+        if error != nil {
+            restorePendingState()
+        } else if pendingUpdateItem == nil {
+            installState = .idle
+        }
+    }
+}
+
+extension AppUpdater: SPUStandardUserDriverDelegate {
+    nonisolated func standardUserDriverShouldHandleShowingScheduledUpdate(_ update: SUAppcastItem,
+                                                                          andInImmediateFocus immediateFocus: Bool) -> Bool {
+        false
+    }
+
+    nonisolated func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool,
+                                                               forUpdate update: SUAppcastItem,
+                                                               state: SPUUserUpdateState) {
+        Task { @MainActor in
+            guard !state.userInitiated else { return }
+
+            let version = versionString(for: update)
+            pendingUpdateItem = update
+
+            switch state.stage {
+            case .notDownloaded:
+                if !installState.isPending {
+                    installState = .available(version: version)
+                }
+            case .downloaded:
+                installState = .ready(version: version)
+            case .installing:
+                installState = .installing(version: version)
+            @unknown default:
+                installState = .available(version: version)
+            }
+        }
+    }
+
+    nonisolated func standardUserDriverWillFinishUpdateSession() {
+        Task { @MainActor in
+            if case .installing = installState {
+                return
+            }
+            restorePendingState()
+        }
+    }
+
+    @objc(updater:willInstallUpdateOnQuit:immediateInstallationBlock:)
+    func updater(_ updater: SPUUpdater,
+                 willInstallUpdateOnQuit item: SUAppcastItem,
+                 immediateInstallationBlock installationBlock: @escaping () -> Void) -> Bool {
+        pendingUpdateItem = item
+        immediateInstallBlock = installationBlock
+        installState = .ready(version: versionString(for: item))
+        return true
+    }
+
+    private func versionString(for item: SUAppcastItem) -> String {
+        if !item.displayVersionString.isEmpty {
+            return item.displayVersionString
+        }
+        return item.versionString
+    }
+
+    private func restorePendingState() {
+        guard let pendingUpdateItem else {
+            immediateInstallBlock = nil
+            installState = .idle
+            return
+        }
+
+        let version = versionString(for: pendingUpdateItem)
+        if immediateInstallBlock != nil {
+            installState = .ready(version: version)
+        } else {
+            installState = .available(version: version)
+        }
     }
 }

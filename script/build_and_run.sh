@@ -7,7 +7,7 @@ BUNDLE_ID="com.sunstory.cursorcat"
 MIN_SYSTEM_VERSION="26.0"
 APP_VERSION="0.1.0"
 APP_BUILD="1"
-DEFAULT_SPARKLE_FEED_URL="https://robinebers.github.io/cursorcat/appcast.xml"
+DEFAULT_SPARKLE_FEED_URL="https://github.com/robinebers/cursorcat/releases/latest/download/appcast.xml"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -129,7 +129,9 @@ if sparkle_is_configured; then
   /usr/libexec/PlistBuddy -c "Add :SUFeedURL string $SPARKLE_FEED_URL" "$INFO_PLIST"
   /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_ED_KEY" "$INFO_PLIST"
   /usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool YES" "$INFO_PLIST"
-  /usr/libexec/PlistBuddy -c "Add :SUAllowsAutomaticUpdates bool NO" "$INFO_PLIST"
+  /usr/libexec/PlistBuddy -c "Add :SUScheduledCheckInterval integer 3600" "$INFO_PLIST"
+  /usr/libexec/PlistBuddy -c "Add :SUAutomaticallyUpdate bool YES" "$INFO_PLIST"
+  /usr/libexec/PlistBuddy -c "Add :SUAllowsAutomaticUpdates bool YES" "$INFO_PLIST"
 fi
 
 # Codesign the bundle with a stable identity so the keychain ACL sticks

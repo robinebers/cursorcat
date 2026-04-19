@@ -6,6 +6,7 @@ PACKAGE_SCRIPT="$ROOT_DIR/script/package_release.sh"
 DIST_DIR="$ROOT_DIR/dist/release"
 DMG_PATH="$DIST_DIR/CursorCat.dmg"
 APPCAST_FILENAME="appcast.xml"
+APPCAST_PATH="$DIST_DIR/$APPCAST_FILENAME"
 NOTARY_PROFILE="${NOTARY_PROFILE:-notarytool-profile}"
 DEFAULT_SPARKLE_PUBLIC_ED_KEY_FILE="${HOME}/.cursorcat/sparkle/public_ed_key.txt"
 DEFAULT_SPARKLE_PRIVATE_KEY_FILE="${HOME}/.cursorcat/sparkle/private_ed25519.pem"
@@ -30,7 +31,6 @@ SPARKLE_PUBLIC_ED_KEY_FILE="${SPARKLE_PUBLIC_ED_KEY_FILE:-$DEFAULT_SPARKLE_PUBLI
 SPARKLE_PRIVATE_KEY_FILE="${SPARKLE_PRIVATE_KEY_FILE:-$DEFAULT_SPARKLE_PRIVATE_KEY_FILE}"
 SPARKLE_BIN_DIR="${SPARKLE_BIN_DIR:-}"
 SPARKLE_SIGN_UPDATE=""
-APPCAST_WORKTREE=""
 
 usage() {
   cat <<'EOF' >&2
@@ -53,7 +53,7 @@ note_failure() {
   echo >&2
   echo "release publish failed." >&2
   if [ "$APPCAST_PUBLISHED" -eq 1 ]; then
-    echo "cleanup: remove the latest appcast entry from gh-pages and push a correction" >&2
+    echo "cleanup: gh release delete-asset \"$VERSION\" \"$APPCAST_FILENAME\" --yes" >&2
   fi
   if [ "$RELEASE_CREATED" -eq 1 ]; then
     echo "cleanup: gh release delete \"$VERSION\" --yes" >&2
@@ -66,13 +66,7 @@ note_failure() {
   fi
 }
 
-cleanup_worktree() {
-  if [ -n "$APPCAST_WORKTREE" ] && [ -d "$APPCAST_WORKTREE" ]; then
-    git worktree remove --force "$APPCAST_WORKTREE" >/dev/null 2>&1 || true
-  fi
-}
-
-trap 'exit_code=$?; trap - EXIT; note_failure "$exit_code"; cleanup_worktree' EXIT
+trap 'exit_code=$?; trap - EXIT; note_failure "$exit_code"' EXIT
 
 run() {
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -111,7 +105,12 @@ ensure_release_identity() {
   local identity="${CODESIGN_IDENTITY:-}"
 
   if [ -z "$identity" ]; then
-    echo "missing Developer ID Application signing identity; set CODESIGN_IDENTITY" >&2
+    identity=$(/usr/bin/security find-identity -p codesigning -v 2>/dev/null \
+      | /usr/bin/awk -F\" '/Developer ID Application:/ { print $2; exit }')
+  fi
+
+  if [ -z "$identity" ]; then
+    echo "missing Developer ID Application signing identity; install one or set CODESIGN_IDENTITY" >&2
     exit 1
   fi
 
@@ -119,6 +118,8 @@ ensure_release_identity() {
     echo "CODESIGN_IDENTITY does not match an available signing identity: $identity" >&2
     exit 1
   fi
+
+  CODESIGN_IDENTITY="$identity"
 }
 
 ensure_notary_profile() {
@@ -246,7 +247,7 @@ parse_origin_remote() {
   remote="${remote%.git}"
   REPO_OWNER="${remote%%/*}"
   REPO_NAME="${remote##*/}"
-  SPARKLE_FEED_URL="${SPARKLE_FEED_URL:-https://${REPO_OWNER}.github.io/${REPO_NAME}/${APPCAST_FILENAME}}"
+  SPARKLE_FEED_URL="${SPARKLE_FEED_URL:-https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/${APPCAST_FILENAME}}"
 }
 
 locate_sparkle_sign_update() {
@@ -296,36 +297,18 @@ sign_release_asset() {
   fi
 }
 
-setup_appcast_worktree() {
-  APPCAST_WORKTREE="$(mktemp -d "${TMPDIR:-/tmp}/cursorcat-gh-pages.XXXXXX")"
-
-  if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
-    run git worktree add -B gh-pages "$APPCAST_WORKTREE" origin/gh-pages
-    return
-  fi
-
-  run git worktree add --detach "$APPCAST_WORKTREE" HEAD
-  if [ "$DRY_RUN" -eq 0 ]; then
-    git -C "$APPCAST_WORKTREE" checkout --orphan gh-pages >/dev/null 2>&1
-    git -C "$APPCAST_WORKTREE" rm -rf --ignore-unmatch . >/dev/null 2>&1 || true
-  fi
-}
-
 write_appcast() {
-  local appcast_path="$APPCAST_WORKTREE/$APPCAST_FILENAME"
   local version_without_prefix="${VERSION#v}"
   local pub_date
 
   pub_date="$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")"
 
   if [ "$DRY_RUN" -eq 1 ]; then
-    echo "would write appcast to $appcast_path"
+    echo "would write appcast to $APPCAST_PATH"
     return
   fi
 
-  touch "$APPCAST_WORKTREE/.nojekyll"
-
-  cat >"$appcast_path" <<EOF
+  cat >"$APPCAST_PATH" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
@@ -350,12 +333,9 @@ EOF
 }
 
 publish_appcast() {
-  setup_appcast_worktree
   write_appcast
 
-  run git -C "$APPCAST_WORKTREE" add "$APPCAST_FILENAME" .nojekyll
-  run git -C "$APPCAST_WORKTREE" commit -m "Publish $VERSION appcast"
-  run git -C "$APPCAST_WORKTREE" push origin gh-pages
+  run gh release upload "$VERSION" "$APPCAST_PATH" --clobber
 
   if [ "$DRY_RUN" -eq 0 ]; then
     APPCAST_PUBLISHED=1

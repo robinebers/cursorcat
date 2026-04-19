@@ -11,6 +11,51 @@ icon = "run"
 command = "./script/build_and_run.sh"
 
 [[actions]]
-name = "Build and Package"
+name = "Build Only"
+icon = "build"
+command = "./script/build_and_run.sh --build"
+
+[[actions]]
+name = "Debug"
+icon = "debug"
+command = "./script/build_and_run.sh --debug"
+
+[[actions]]
+name = "Logs"
+icon = "logs"
+command = "./script/build_and_run.sh --logs"
+
+[[actions]]
+name = "Telemetry"
+icon = "logs"
+command = "./script/build_and_run.sh --telemetry"
+
+[[actions]]
+name = "Verify Launch"
+icon = "check"
+command = "./script/build_and_run.sh --verify"
+
+[[actions]]
+name = "Package App"
 icon = "package"
 command = "./script/package_release.sh app"
+
+[[actions]]
+name = "Notarize App"
+icon = "package"
+command = "./script/package_release.sh notarize-app"
+
+[[actions]]
+name = "Build DMG"
+icon = "package"
+command = "./script/package_release.sh dmg"
+
+[[actions]]
+name = "Local Release Artifact"
+icon = "package"
+command = "./script/package_release.sh release"
+
+[[actions]]
+name = "🚨 Publish GitHub Release"
+icon = "package"
+command = "./script/publish_release.sh"

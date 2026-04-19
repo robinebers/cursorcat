@@ -34,7 +34,6 @@ enum InteractionMenuAction: Int, CaseIterable {
 @MainActor
 final class ActionsMenuBuilder {
     weak var target: AnyObject?
-    let refreshSelector: Selector
     let checkForUpdatesSelector: Selector
     let aboutSelector: Selector
     let openCursorSelector: Selector
@@ -44,7 +43,6 @@ final class ActionsMenuBuilder {
     let interactSelector: Selector
 
     init(target: AnyObject,
-         refreshSelector: Selector,
          checkForUpdatesSelector: Selector,
          aboutSelector: Selector,
          openCursorSelector: Selector,
@@ -53,7 +51,6 @@ final class ActionsMenuBuilder {
          quitSelector: Selector,
          interactSelector: Selector) {
         self.target = target
-        self.refreshSelector = refreshSelector
         self.checkForUpdatesSelector = checkForUpdatesSelector
         self.aboutSelector = aboutSelector
         self.openCursorSelector = openCursorSelector
@@ -76,13 +73,23 @@ final class ActionsMenuBuilder {
             menu.addItem(.separator())
         }
 
+        let cloud = NSMenuItem(title: "Cloud agents",
+                               action: openCloudAgentsSelector,
+                               keyEquivalent: "")
+        cloud.target = target
+        menu.addItem(cloud)
+
+        let status = NSMenuItem(title: "Cursor status",
+                                action: openStatusSelector,
+                                keyEquivalent: "")
+        status.target = target
+        menu.addItem(status)
+
+        menu.addItem(.separator())
+
         menu.addItem(makeInteractItem())
 
-        let refresh = NSMenuItem(title: "Refresh now",
-                                 action: refreshSelector,
-                                 keyEquivalent: "r")
-        refresh.target = target
-        menu.addItem(refresh)
+        menu.addItem(.separator())
 
         let checkForUpdates = NSMenuItem(title: "Check for Updates…",
                                          action: checkForUpdatesSelector,
@@ -91,33 +98,13 @@ final class ActionsMenuBuilder {
         checkForUpdates.isEnabled = canCheckForUpdates
         menu.addItem(checkForUpdates)
 
-        menu.addItem(.separator())
-
-        let about = NSMenuItem(title: "About CursorCat",
+        let about = NSMenuItem(title: "About",
                                action: aboutSelector,
                                keyEquivalent: "")
         about.target = target
         menu.addItem(about)
 
-        let cloud = NSMenuItem(title: "Cloud Agents",
-                               action: openCloudAgentsSelector,
-                               keyEquivalent: "")
-        cloud.target = target
-        cloud.image = NSImage(systemSymbolName: "cloud",
-                              accessibilityDescription: nil)
-        menu.addItem(cloud)
-
-        let status = NSMenuItem(title: "Cursor Status",
-                                action: openStatusSelector,
-                                keyEquivalent: "")
-        status.target = target
-        status.image = NSImage(systemSymbolName: "waveform.path.ecg",
-                               accessibilityDescription: nil)
-        menu.addItem(status)
-
-        menu.addItem(.separator())
-
-        let quit = NSMenuItem(title: "Quit CursorCat",
+        let quit = NSMenuItem(title: "Quit",
                               action: quitSelector,
                               keyEquivalent: "q")
         quit.target = target

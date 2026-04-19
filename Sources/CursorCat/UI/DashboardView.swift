@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardActions {
     var refresh: () -> Void
     var openCursor: () -> Void
+    var installUpdate: () -> Void
 }
 
 struct DashboardView: View {
@@ -11,6 +12,7 @@ struct DashboardView: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var settings: UserSettings
     @ObservedObject var scheduler: PollScheduler
+    @ObservedObject var updater: AppUpdater
     let actions: DashboardActions
 
     var body: some View {
@@ -27,6 +29,7 @@ struct DashboardView: View {
                     snapshot: store.snapshot,
                     settings: settings,
                     scheduler: scheduler,
+                    updater: updater,
                     actions: actions
                 )
             }
