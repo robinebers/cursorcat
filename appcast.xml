@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>CursorCat Updates</title>
+    <link>https://robinebers.github.io/cursorcat/appcast.xml</link>
+    <description>Stable releases for CursorCat</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.1.0</title>
+      <sparkle:version>0.1.0</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:releaseNotesLink>https://github.com/robinebers/cursorcat/releases/tag/v0.1.0</sparkle:releaseNotesLink>
+      <pubDate>Sun, 19 Apr 2026 07:32:34 +0000</pubDate>
+      <enclosure url="https://github.com/robinebers/cursorcat/releases/download/v0.1.0/CursorCat.dmg"
+                 sparkle:edSignature="HJ3mWk8pTKAtb3g11cRQ2czpCi7d2YcEg/B1H7bNc9RdFu7iujVXQogqkj5mpYs9wQHaSm5QP6BISYwPfsH/Ag=="
+                 length="3579902"
+                 type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>
