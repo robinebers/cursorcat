@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-release}"
+MODE="${1:-app}"
 APP_NAME="CursorCat"
 BUNDLE_ID="${BUNDLE_ID:-com.sunstory.cursorcat}"
 MIN_SYSTEM_VERSION="26.0"
@@ -46,11 +46,6 @@ ensure_release_identity() {
   fi
 
   RELEASE_IDENTITY="${CODESIGN_IDENTITY:-}"
-  if [ -z "$RELEASE_IDENTITY" ]; then
-    RELEASE_IDENTITY=$(/usr/bin/security find-identity -p codesigning -v 2>/dev/null \
-      | /usr/bin/awk -F\" '/Developer ID Application:/ { print $2; exit }')
-  fi
-
   if [ -z "$RELEASE_IDENTITY" ]; then
     echo "missing Developer ID Application signing identity; set CODESIGN_IDENTITY" >&2
     exit 1
@@ -124,12 +119,12 @@ assemble_app() {
   cp "$BUILD_BINARY" "$APP_BINARY"
   chmod +x "$APP_BINARY"
   cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME"
-  if [ -f "$ICON_ICNS" ]; then
-    cp "$ICON_ICNS" "$APP_RESOURCES/AppIcon.icns"
+  if [ ! -f "$ICON_ICNS" ] || [ ! -f "$ICON_ASSET_CAR" ]; then
+    echo "missing required icon artifacts in Resources/AppIcon" >&2
+    exit 1
   fi
-  if [ -f "$ICON_ASSET_CAR" ]; then
-    cp "$ICON_ASSET_CAR" "$APP_RESOURCES/Assets.car"
-  fi
+  cp "$ICON_ICNS" "$APP_RESOURCES/AppIcon.icns"
+  cp "$ICON_ASSET_CAR" "$APP_RESOURCES/Assets.car"
   write_info_plist
 }
 

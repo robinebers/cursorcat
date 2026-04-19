@@ -17,11 +17,13 @@ settings:
     INFOPLIST_KEY_LSUIElement: YES
     INFOPLIST_KEY_NSHighResolutionCapable: YES
     INFOPLIST_KEY_NSPrincipalClass: NSApplication
-    CODE_SIGN_ENTITLEMENTS: script/CursorCat.dev.entitlements.plist
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     OTHER_LDFLAGS:
       - "$(inherited)"
       - "-lsqlite3"
+  configs:
+    Debug:
+      CODE_SIGN_ENTITLEMENTS: script/CursorCat.dev.entitlements.plist
 
 targets:
   CursorCat:

@@ -14,6 +14,30 @@ struct LoadingCard: View {
     }
 }
 
+struct FailedCard: View {
+    let message: String?
+    let actions: DashboardActions
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "Update Failed")
+            if let message {
+                ErrorBanner(message: message)
+            } else {
+                Text("CursorCat couldn’t refresh your usage right now.")
+                    .foregroundStyle(.secondary)
+            }
+            Button(action: actions.refresh) {
+                Text("Try Again")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glass)
+            .controlSize(.large)
+            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
 struct LoggedOutCard: View {
     let actions: DashboardActions
 

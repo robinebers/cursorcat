@@ -15,8 +15,10 @@ enum Log {
 /// Keeps 3 days of logs, best effort. Never throws to caller.
 final class FileLog: @unchecked Sendable {
     static let shared = FileLog()
+    static let rawDumpEnabled = ProcessInfo.processInfo.environment["CURSORCAT_LOG_RAW"] == "1"
 
     private let queue = DispatchQueue(label: "cursorcat.filelog")
+    private let logsDirURL: URL?
     private let fileURL: URL?
     private let formatter: DateFormatter = {
         let f = DateFormatter()
@@ -29,19 +31,22 @@ final class FileLog: @unchecked Sendable {
         guard let logsDir = fm.urls(for: .libraryDirectory, in: .userDomainMask).first?
             .appendingPathComponent("Logs/CursorCat", isDirectory: true)
         else {
+            logsDirURL = nil
             fileURL = nil
             return
         }
         try? fm.createDirectory(at: logsDir, withIntermediateDirectories: true)
+        logsDirURL = logsDir
         fileURL = logsDir.appendingPathComponent("cursorcat.log")
         rotateIfNeeded(dir: logsDir)
     }
 
     func write(_ message: String, category: String = "app") {
-        guard let url = fileURL else { return }
+        guard let logsDirURL, let url = fileURL else { return }
         let stamp = formatter.string(from: Date())
         let line = "\(stamp) [\(category)] \(message)\n"
-        queue.async {
+        queue.async { [self] in
+            rotateIfNeeded(dir: logsDirURL)
             if let data = line.data(using: .utf8) {
                 if FileManager.default.fileExists(atPath: url.path) {
                     if let handle = try? FileHandle(forWritingTo: url) {

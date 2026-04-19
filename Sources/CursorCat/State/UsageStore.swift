@@ -28,7 +28,7 @@ struct UsageSnapshot: Equatable {
     var lastError: String?
     var isLoggedIn: Bool = true
 
-    static let loading = UsageSnapshot()
+    static let loading = UsageSnapshot(isLoggedIn: false)
 }
 
 @MainActor
@@ -56,7 +56,6 @@ final class UsageStore: ObservableObject {
         latestAPISnapshot = api
         snapshot = UsageSnapshotProjector.project(
             api: api,
-            previous: snapshot,
             costMode: settings.costMode,
             now: now,
             calendar: calendar
@@ -65,6 +64,7 @@ final class UsageStore: ObservableObject {
     }
 
     func setLoggedOut() {
+        latestAPISnapshot = nil
         snapshot = UsageSnapshot(lastUpdated: snapshot.lastUpdated, isLoggedIn: false)
         viewState = .loggedOut
     }
@@ -81,16 +81,23 @@ final class UsageStore: ObservableObject {
     }
 
     private func reprojectLatestSnapshot() {
-        guard let latestAPISnapshot else { return }
+        guard let latestAPISnapshot, viewState != .loggedOut else { return }
 
         let preservedLastUpdated = snapshot.lastUpdated
+        let preservedLastError = snapshot.lastError
+        let preservedViewState = viewState
         var next = UsageSnapshotProjector.project(
             api: latestAPISnapshot,
-            previous: snapshot,
-            costMode: settings.costMode
+            costMode: settings.costMode,
+            now: preservedLastUpdated ?? Date()
         )
         next.lastUpdated = preservedLastUpdated
+        if preservedViewState != .loaded {
+            next.lastError = preservedLastError
+        }
         snapshot = next
-        viewState = .loaded
+        if preservedViewState == .loaded {
+            viewState = .loaded
+        }
     }
 }

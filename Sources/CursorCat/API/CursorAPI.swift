@@ -55,8 +55,7 @@ actor CursorAPI {
     func fetchSnapshot() async throws -> APISnapshot {
         return try await retryingOnAuth {
             let token = try await self.auth.accessToken()
-            let (userID, sessionToken) = try await self.auth.buildSessionToken(token)
-            _ = userID
+            let (_, sessionToken) = try await self.auth.buildSessionToken(token)
 
             async let usage = self.rpc.getCurrentPeriodUsage(token: token)
             async let plan = self.rpc.getPlanInfo(token: token)
@@ -64,14 +63,32 @@ actor CursorAPI {
             async let stripeCents = self.stripe.creditBalanceCents(sessionToken: sessionToken)
 
             let usageVal = try await usage
-            let planVal = try? await plan
-            let creditsVal = try? await credits
+            let planVal: GetPlanInfoResponse?
+            do {
+                planVal = try await plan
+            } catch {
+                Log.api.warning("plan info unavailable: \(error.localizedDescription)")
+                planVal = nil
+            }
+            let creditsVal: GetCreditGrantsBalanceResponse?
+            do {
+                creditsVal = try await credits
+            } catch {
+                Log.api.warning("credit grants unavailable: \(error.localizedDescription)")
+                creditsVal = nil
+            }
 
             let (start, end) = Self.csvWindow(usage: usageVal)
 
             async let rows = self.csv.fetch(sessionToken: sessionToken, start: start, end: end)
-            let rowsVal = (try? await rows) ?? []
-            let stripeVal = (try? await stripeCents) ?? 0
+            let rowsVal = try await rows
+            let stripeVal: Int
+            do {
+                stripeVal = try await stripeCents
+            } catch {
+                Log.api.warning("stripe balance unavailable: \(error.localizedDescription)")
+                stripeVal = 0
+            }
 
             return APISnapshot(
                 usage: usageVal,

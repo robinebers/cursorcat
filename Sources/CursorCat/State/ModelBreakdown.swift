@@ -163,7 +163,14 @@ enum ModelBreakdownAggregator {
     private static func hasVisibleUsage(_ row: UsageCSVRow, costMode: CostMode) -> Bool {
         switch costMode {
         case .actual:
-            return row.tokens.totalTokens != 0 || row.costDollars(for: .actual) > 0
+            switch row.actualCostKind {
+            case .charged(let amount):
+                return amount > 0
+            case .included:
+                return false
+            case .unavailable:
+                return row.tokens.totalTokens != 0
+            }
         case .rawAPI:
             return row.tokens.totalTokens != 0 || row.imputedCostDollars != 0
         }

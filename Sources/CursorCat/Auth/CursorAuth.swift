@@ -5,6 +5,7 @@ enum CursorAuthError: Error, CustomStringConvertible {
     case notLoggedIn
     case sessionExpired
     case refreshFailed(status: Int)
+    case invalidRefreshResponse
     case missingUserID
 
     var description: String {
@@ -12,6 +13,7 @@ enum CursorAuthError: Error, CustomStringConvertible {
         case .notLoggedIn: return "Not logged in"
         case .sessionExpired: return "Session expired"
         case .refreshFailed(let status): return "Token refresh failed (HTTP \(status))"
+        case .invalidRefreshResponse: return "Token refresh returned an invalid response"
         case .missingUserID: return "Access token missing a user id"
         }
     }
@@ -33,6 +35,18 @@ struct AuthState {
     var accessToken: String?
     var refreshToken: String?
     var source: AuthSource?
+}
+
+private struct RefreshResponse: Decodable {
+    let accessToken: String?
+    let refreshToken: String?
+    let shouldLogout: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case refreshToken = "refresh_token"
+        case shouldLogout
+    }
 }
 
 /// Orchestrator: loadAuth → refreshIfNeeded → access token.
@@ -102,13 +116,11 @@ actor CursorAuth {
         }
 
         if forceRefresh || needsRefresh(state.accessToken) {
-            if let refreshed = try await performRefresh(state: state) {
-                state.accessToken = refreshed
-                cached = state
-            }
+            state = try await performRefresh(state: state)
+            cached = state
         }
 
-        guard let token = state.accessToken else {
+        guard let token = state.accessToken, !needsRefresh(token) else {
             throw CursorAuthError.notLoggedIn
         }
         return token
@@ -124,12 +136,11 @@ actor CursorAuth {
         return exp.timeIntervalSinceNow < Self.refreshBuffer
     }
 
-    /// POST to /oauth/token and persist the new access token back to its source.
-    /// Returns nil if the server responded OK but with no usable token.
-    private func performRefresh(state: AuthState) async throws -> String? {
+    /// POST to /oauth/token and persist rotated credentials back to their source.
+    private func performRefresh(state: AuthState) async throws -> AuthState {
         guard let refreshToken = state.refreshToken else {
             Log.auth.warning("refresh skipped: no refresh token")
-            return nil
+            throw CursorAuthError.sessionExpired
         }
 
         var req = URLRequest(url: Self.refreshURL)
@@ -144,12 +155,14 @@ actor CursorAuth {
         req.timeoutInterval = 15
 
         let (data, response) = try await session.data(for: req)
-        guard let http = response as? HTTPURLResponse else { return nil }
+        guard let http = response as? HTTPURLResponse else {
+            throw CursorAuthError.invalidRefreshResponse
+        }
 
-        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        let payload = try? JSONDecoder().decode(RefreshResponse.self, from: data)
 
         if http.statusCode == 400 || http.statusCode == 401 {
-            let shouldLogout = (json?["shouldLogout"] as? Bool) == true
+            let shouldLogout = payload?.shouldLogout == true
             Log.auth.error("refresh failed status=\(http.statusCode) shouldLogout=\(shouldLogout)")
             throw shouldLogout ? CursorAuthError.sessionExpired
                                : CursorAuthError.refreshFailed(status: http.statusCode)
@@ -157,30 +170,53 @@ actor CursorAuth {
 
         if !(200..<300).contains(http.statusCode) {
             Log.auth.warning("refresh unexpected status: \(http.statusCode)")
-            return nil
+            throw CursorAuthError.refreshFailed(status: http.statusCode)
         }
 
-        if (json?["shouldLogout"] as? Bool) == true {
+        guard let payload else {
+            throw CursorAuthError.invalidRefreshResponse
+        }
+
+        if payload.shouldLogout == true {
             throw CursorAuthError.sessionExpired
         }
 
-        guard let newAccess = json?["access_token"] as? String, !newAccess.isEmpty else {
-            return nil
+        guard let newAccess = payload.accessToken, !newAccess.isEmpty else {
+            throw CursorAuthError.invalidRefreshResponse
         }
 
-        persistAccessToken(newAccess, to: state.source)
+        let nextState = AuthState(
+            accessToken: newAccess,
+            refreshToken: payload.refreshToken ?? state.refreshToken,
+            source: state.source
+        )
+        try persist(state: nextState)
         Log.auth.info("refresh succeeded and persisted to \(state.source?.rawValue ?? "unknown")")
-        return newAccess
+        return nextState
     }
 
-    private func persistAccessToken(_ token: String, to source: AuthSource?) {
-        switch source {
+    private func persist(state: AuthState) throws {
+        switch state.source {
         case .keychain:
-            CursorKeychain.write(token, service: Self.keychainAccessService)
+            guard let accessToken = state.accessToken,
+                  CursorKeychain.write(accessToken, service: Self.keychainAccessService) else {
+                throw CursorAuthError.invalidRefreshResponse
+            }
+            if let refreshToken = state.refreshToken,
+               !CursorKeychain.write(refreshToken, service: Self.keychainRefreshService) {
+                throw CursorAuthError.invalidRefreshResponse
+            }
         case .sqlite:
-            CursorSQLite.writeValue(token, for: Self.accessTokenKey)
+            guard let accessToken = state.accessToken,
+                  CursorSQLite.writeValue(accessToken, for: Self.accessTokenKey) else {
+                throw CursorAuthError.invalidRefreshResponse
+            }
+            if let refreshToken = state.refreshToken,
+               !CursorSQLite.writeValue(refreshToken, for: Self.refreshTokenKey) {
+                throw CursorAuthError.invalidRefreshResponse
+            }
         case .none:
-            break
+            throw CursorAuthError.invalidRefreshResponse
         }
     }
 

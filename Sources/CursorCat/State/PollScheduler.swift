@@ -17,6 +17,9 @@ final class PollScheduler: ObservableObject {
     private var authMonitorTimer: DispatchSourceTimer?
     private var consecutiveFailures = 0
     private var wakeWorkItem: DispatchWorkItem?
+    private var wakeObserver: NSObjectProtocol?
+    private var hasStarted = false
+    private var lastKnownHasLocalAuth: Bool?
 
     @Published private(set) var nextRefreshAt: Date?
     @Published private(set) var manualRefreshLockedUntil: Date?
@@ -29,15 +32,19 @@ final class PollScheduler: ObservableObject {
     }
 
     func start() {
+        guard !hasStarted else { return }
+        hasStarted = true
         scheduleTimer(interval: normalInterval)
         startAuthMonitor()
 
-        NSWorkspace.shared.notificationCenter.addObserver(
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.handleWake() }
+            Task { @MainActor in
+                self?.handleWake()
+            }
         }
 
         triggerNow() // first launch
@@ -68,6 +75,20 @@ final class PollScheduler: ObservableObject {
         return date >= manualRefreshLockedUntil
     }
 
+    func stop() {
+        timer?.cancel()
+        timer = nil
+        authMonitorTimer?.cancel()
+        authMonitorTimer = nil
+        wakeWorkItem?.cancel()
+        wakeWorkItem = nil
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+            self.wakeObserver = nil
+        }
+        hasStarted = false
+    }
+
     private func scheduleTimer(interval: TimeInterval) {
         scheduleTimer(deadline: Date().addingTimeInterval(interval), repeating: interval)
     }
@@ -78,7 +99,7 @@ final class PollScheduler: ObservableObject {
         let delay = max(0, deadline.timeIntervalSinceNow)
         t.schedule(deadline: .now() + delay, repeating: interval, leeway: .seconds(10))
         t.setEventHandler { [weak self] in
-            MainActor.assumeIsolated { self?.triggerNow() }
+            self?.triggerNow()
         }
         t.resume()
         timer = t
@@ -113,6 +134,7 @@ final class PollScheduler: ObservableObject {
         let hasLocalAuth = state.accessToken != nil || state.refreshToken != nil
 
         if !hasLocalAuth {
+            lastKnownHasLocalAuth = false
             await auth.invalidate()
             if store.viewState != .loggedOut {
                 store.setLoggedOut()
@@ -120,7 +142,10 @@ final class PollScheduler: ObservableObject {
             return
         }
 
-        if store.viewState == .loggedOut && !isRefreshing {
+        let authJustAppeared = lastKnownHasLocalAuth == false
+        lastKnownHasLocalAuth = true
+
+        if authJustAppeared && store.viewState == .loggedOut && !isRefreshing {
             await auth.invalidate()
             await runOnce()
         }
@@ -143,8 +168,10 @@ final class PollScheduler: ObservableObject {
             Log.poll.info("poll ok")
             let derived = store.snapshot
             FileLog.shared.write("poll ok: today=\(derived.todaySpend ?? -1) yesterday=\(derived.yesterdaySpend ?? -1) cycle=\(derived.billingCycleSpend ?? -1) plan=\(derived.plan ?? "?") csvRows=\(snapshot.csvRows.count)", category: "poll")
-            let dump = await api.collectRawDump()
-            FileLog.shared.write(dump, category: "raw")
+            if FileLog.rawDumpEnabled {
+                let dump = await api.collectRawDump()
+                FileLog.shared.write(dump, category: "raw")
+            }
         } catch let err as CursorAuthError where err.shouldLogOut {
             Log.poll.error("poll logged-out: \(err.description)")
             store.setLoggedOut()
@@ -168,4 +195,5 @@ final class PollScheduler: ObservableObject {
         f.dateFormat = "HH:mm"
         return f.string(from: date)
     }
+
 }

@@ -41,4 +41,10 @@ final class AppContainer {
         behavior.start()
         scheduler.start()
     }
+
+    func stop() {
+        behavior.stop()
+        scheduler.stop()
+        hotKeyController.stop()
+    }
 }

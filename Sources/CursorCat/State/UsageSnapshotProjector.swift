@@ -3,12 +3,11 @@ import Foundation
 enum UsageSnapshotProjector {
     static func project(
         api: APISnapshot,
-        previous: UsageSnapshot,
         costMode: CostMode,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> UsageSnapshot {
-        var next = previous
+        var next = UsageSnapshot()
         next.isLoggedIn = true
         next.lastError = nil
         next.lastUpdated = now

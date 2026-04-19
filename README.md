@@ -27,6 +27,15 @@ No. CursorCat is an unofficial companion app, made by a fan of Cursor. It doesnâ
 
 Grab the latest build from the [releases page](https://github.com/robinebers/cursorcat/releases/latest).
 
+## Development Notes
+
+- Local app bundles are staged with `./script/build_and_run.sh`.
+- Release packaging is handled by `./script/package_release.sh`, which now defaults to `app` instead of a full notarize + DMG flow.
+- `CODESIGN_IDENTITY` is required for release signing and notarization.
+- Raw RPC/CSV payload logging is disabled by default. Set `CURSORCAT_LOG_RAW=1` only when you explicitly need verbose diagnostics.
+- Xcode Debug uses `script/CursorCat.dev.entitlements.plist`; Release should not ship with that development entitlement.
+- If you move or rename the repo directory, clear `.build/` before rebuilding so SwiftPM does not reuse stale module-cache paths from the old location.
+
 ## What Is The Cat?
 
 The cat is a Neko-style desktop cat. Neko is a long-running cursor-chasing cat character that has been reimplemented on different platforms over the years. This repo bundles the `oneko.gif` sprite sheet from [adryd325/oneko.js](https://github.com/adryd325/oneko.js), which is licensed under MIT.

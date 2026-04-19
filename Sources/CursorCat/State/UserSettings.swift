@@ -21,6 +21,8 @@ final class UserSettings: ObservableObject {
         didSet { persistGlobalShortcut() }
     }
 
+    @Published var globalShortcutRegistrationError: String?
+
     @Published var costMode: CostMode {
         didSet { defaults.set(costMode.rawValue, forKey: Keys.costMode) }
     }

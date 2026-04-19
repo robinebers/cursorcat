@@ -21,7 +21,7 @@ struct DashboardView: View {
             case .loading:
                 LoadingCard()
             case .failed:
-                LoadingCard()
+                FailedCard(message: store.snapshot.lastError, actions: actions)
             case .loaded:
                 DashboardContent(
                     snapshot: store.snapshot,

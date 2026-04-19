@@ -5,3 +5,5 @@ dist/
 *.log
 .codex/cache/
 docs/plans/
+*.xcuserstate
+xcuserdata/

@@ -14,6 +14,13 @@ struct DashboardSettingsView: View {
 
                 ShortcutRecorder(settings: settings)
 
+                if let error = settings.globalShortcutRegistrationError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Text("Toggles the popover from anywhere.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -56,36 +63,39 @@ private struct ShortcutRecorder: View {
     @State private var eventMonitor: Any?
 
     var body: some View {
-        Button(action: toggleRecording) {
-            HStack(spacing: 8) {
-                chipContent
-                Spacer(minLength: 0)
-                if !isRecording, settings.globalShortcut != nil {
-                    Button(action: clear) {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.secondary)
-                            .imageScale(.medium)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Clear shortcut")
-                    .accessibilityLabel("Clear shortcut")
+        HStack(spacing: 8) {
+            Button(action: toggleRecording) {
+                HStack(spacing: 8) {
+                    chipContent
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(.quinary)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(borderColor, lineWidth: isRecording ? 1.5 : 1)
+                )
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.quinary)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(borderColor, lineWidth: isRecording ? 1.5 : 1)
-            )
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            if !isRecording, settings.globalShortcut != nil {
+                Button(action: clear) {
+                    Image(systemName: "xmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                        .imageScale(.medium)
+                }
+                .buttonStyle(.plain)
+                .help("Clear shortcut")
+                .accessibilityLabel("Clear shortcut")
+            }
         }
-        .buttonStyle(.plain)
         .onDisappear {
             stopRecording()
         }
@@ -142,6 +152,7 @@ private struct ShortcutRecorder: View {
                 return nil
             }
 
+            settings.globalShortcutRegistrationError = nil
             settings.globalShortcut = shortcut
             stopRecording()
             return nil

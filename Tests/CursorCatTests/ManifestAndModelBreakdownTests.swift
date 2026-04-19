@@ -157,16 +157,15 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
 
         let snapshot = UsageSnapshotProjector.project(
             api: api,
-            previous: .loading,
             costMode: .rawAPI,
             now: now,
             calendar: calendar
         )
 
-        XCTAssertEqual(snapshot.rangeSummaries[.today], DashboardRangeSummary(totalCents: 100, comparisonCents: 200, comparisonLabel: "vs. yesterday"))
-        XCTAssertEqual(snapshot.rangeSummaries[.yesterday], DashboardRangeSummary(totalCents: 200, comparisonCents: 100, comparisonLabel: "vs. today"))
-        XCTAssertEqual(snapshot.rangeSummaries[.billingCycle], DashboardRangeSummary(totalCents: 600, comparisonCents: 1000, comparisonLabel: "vs. prev billing cycle"))
-        XCTAssertEqual(snapshot.rangeSummaries[.last30Days], DashboardRangeSummary(totalCents: 1600, comparisonCents: 500, comparisonLabel: "vs. prev. 30 days"))
+        XCTAssertEqual(snapshot.rangeSummaries[DashboardRange.today], DashboardRangeSummary(totalCents: 100, comparisonCents: 200, comparisonLabel: "vs. yesterday"))
+        XCTAssertEqual(snapshot.rangeSummaries[DashboardRange.yesterday], DashboardRangeSummary(totalCents: 200, comparisonCents: 100, comparisonLabel: "vs. today"))
+        XCTAssertEqual(snapshot.rangeSummaries[DashboardRange.billingCycle], DashboardRangeSummary(totalCents: 600, comparisonCents: 1000, comparisonLabel: "vs. prev billing cycle"))
+        XCTAssertEqual(snapshot.rangeSummaries[DashboardRange.last30Days], DashboardRangeSummary(totalCents: 1600, comparisonCents: 500, comparisonLabel: "vs. prev. 30 days"))
     }
 
     func testCSVWindowStartsAtPreviousBillingCycleStart() {

@@ -41,12 +41,12 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME"
-if [ -f "$ICON_ICNS" ]; then
-  cp "$ICON_ICNS" "$APP_RESOURCES/AppIcon.icns"
+if [ ! -f "$ICON_ICNS" ] || [ ! -f "$ICON_ASSET_CAR" ]; then
+  echo "missing required icon artifacts in Resources/AppIcon" >&2
+  exit 1
 fi
-if [ -f "$ICON_ASSET_CAR" ]; then
-  cp "$ICON_ASSET_CAR" "$APP_RESOURCES/Assets.car"
-fi
+cp "$ICON_ICNS" "$APP_RESOURCES/AppIcon.icns"
+cp "$ICON_ASSET_CAR" "$APP_RESOURCES/Assets.car"
 chmod +x "$APP_BINARY"
 
 cat >"$INFO_PLIST" <<PLIST

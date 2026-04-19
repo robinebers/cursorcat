@@ -28,6 +28,8 @@ Notes:
 - The script stages a local `.app` bundle into `dist/`.
 - If an Apple Development signing identity is available, the script uses it.
 - If no signing identity is available, it falls back to ad-hoc signing.
+- Raw RPC/CSV payload logging is disabled by default. Set `CURSORCAT_LOG_RAW=1` only for explicit diagnostics.
+- If the repo path changes, clear `.build/` before rebuilding so SwiftPM does not reuse module-cache paths from the old location.
 
 ## Packaging A Release
 
@@ -46,6 +48,11 @@ Supported modes:
 
 Optional environment variables:
 
-- `CODESIGN_IDENTITY` to override the signing identity
 - `NOTARY_PROFILE` to override the `notarytool` keychain profile name
 - `APP_VERSION` and `APP_BUILD` to override bundle version metadata
+
+Notes:
+
+- `./script/package_release.sh` now defaults to `app` instead of a full release flow.
+- `CODESIGN_IDENTITY` is required for release signing and notarization.
+- Xcode Debug uses `script/CursorCat.dev.entitlements.plist`; Release should not.

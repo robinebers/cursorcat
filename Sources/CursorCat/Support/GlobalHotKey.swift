@@ -110,6 +110,8 @@ final class GlobalHotKeyController {
     private var eventHandlerRef: EventHandlerRef?
     private var hotKeyRef: EventHotKeyRef?
     private var cancellables: Set<AnyCancellable> = []
+    private var lastRegisteredShortcut: GlobalShortcut?
+    private var isRollingBackShortcut = false
 
     init(settings: UserSettings, onTrigger: @escaping () -> Void) {
         self.settings = settings
@@ -121,7 +123,12 @@ final class GlobalHotKeyController {
         settings.$globalShortcut
             .receive(on: RunLoop.main)
             .sink { [weak self] shortcut in
-                self?.register(shortcut)
+                guard let self else { return }
+                if self.isRollingBackShortcut {
+                    self.isRollingBackShortcut = false
+                    return
+                }
+                self.register(shortcut)
             }
             .store(in: &cancellables)
     }
@@ -132,7 +139,7 @@ final class GlobalHotKeyController {
             eventKind: UInt32(kEventHotKeyPressed)
         )
 
-        InstallEventHandler(
+        let status = InstallEventHandler(
             GetApplicationEventTarget(),
             Self.handler,
             1,
@@ -140,6 +147,9 @@ final class GlobalHotKeyController {
             Unmanaged.passUnretained(self).toOpaque(),
             &eventHandlerRef
         )
+        if status != noErr {
+            settings.globalShortcutRegistrationError = "Global shortcut handler could not be installed."
+        }
     }
 
     private func register(_ shortcut: GlobalShortcut?) {
@@ -148,10 +158,29 @@ final class GlobalHotKeyController {
             self.hotKeyRef = nil
         }
 
-        guard let shortcut else { return }
+        guard let shortcut else {
+            lastRegisteredShortcut = nil
+            settings.globalShortcutRegistrationError = nil
+            return
+        }
 
+        if attemptRegistration(shortcut) {
+            lastRegisteredShortcut = shortcut
+            settings.globalShortcutRegistrationError = nil
+            return
+        }
+
+        if let lastRegisteredShortcut {
+            _ = attemptRegistration(lastRegisteredShortcut)
+        }
+        settings.globalShortcutRegistrationError = "That shortcut is unavailable. Try a different combination."
+        isRollingBackShortcut = true
+        settings.globalShortcut = lastRegisteredShortcut
+    }
+
+    private func attemptRegistration(_ shortcut: GlobalShortcut) -> Bool {
         let hotKeyID = EventHotKeyID(signature: Self.signature, id: 1)
-        RegisterEventHotKey(
+        let status = RegisterEventHotKey(
             shortcut.keyCode,
             shortcut.modifiers,
             hotKeyID,
@@ -159,6 +188,7 @@ final class GlobalHotKeyController {
             0,
             &hotKeyRef
         )
+        return status == noErr
     }
 
     private func handleHotKey(_ event: EventRef?) {
@@ -177,5 +207,16 @@ final class GlobalHotKeyController {
 
         guard status == noErr, hotKeyID.signature == Self.signature else { return }
         onTrigger()
+    }
+
+    func stop() {
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
+        }
+        if let eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
+            self.eventHandlerRef = nil
+        }
     }
 }
