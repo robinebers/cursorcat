@@ -8,7 +8,7 @@ struct DashboardSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Global trigger shortcut")
+                Text("Keyboard shortcut")
                     .font(.callout)
                     .fontWeight(.semibold)
 
@@ -21,7 +21,7 @@ struct DashboardSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("Toggles the popover from anywhere.")
+                Text("Open CursorCat from anywhere.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -31,10 +31,10 @@ struct DashboardSettingsView: View {
 
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Use raw API cost")
+                    Text("Show full usage cost")
                         .font(.callout)
                         .fontWeight(.semibold)
-                    Text("Ignores included and free usage credits.")
+                    Text("Includes usage covered by your plan and free credits.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

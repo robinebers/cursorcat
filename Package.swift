@@ -9,15 +9,22 @@ let package = Package(
     products: [
         .executable(name: "CursorCat", targets: ["CursorCat"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.1")
+    ],
     targets: [
         .executableTarget(
             name: "CursorCat",
+            dependencies: [
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources/CursorCat",
             resources: [
                 .process("Resources")
             ],
             linkerSettings: [
-                .linkedLibrary("sqlite3")
+                .linkedLibrary("sqlite3"),
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])
             ]
         ),
         .testTarget(

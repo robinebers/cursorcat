@@ -13,12 +13,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let settings: UserSettings
     private let animator: CatAnimator
     private let scheduler: PollScheduler
+    private let updater: AppUpdater
     private let popover: NSPopover
     private var eventMonitor: EventMonitor?
     private var cancellables: Set<AnyCancellable> = []
     private lazy var menuBuilder = ActionsMenuBuilder(
         target: self,
         refreshSelector: #selector(refreshNow),
+        checkForUpdatesSelector: #selector(checkForUpdates),
+        aboutSelector: #selector(showAbout),
         openCursorSelector: #selector(openCursor),
         openCloudAgentsSelector: #selector(openCloudAgents),
         openStatusSelector: #selector(openStatus),
@@ -29,12 +32,14 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     init(store: UsageStore,
          settings: UserSettings,
          animator: CatAnimator,
-         scheduler: PollScheduler) {
+         scheduler: PollScheduler,
+         updater: AppUpdater) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.store = store
         self.settings = settings
         self.animator = animator
         self.scheduler = scheduler
+        self.updater = updater
         self.popover = NSPopover()
         super.init()
 
@@ -153,7 +158,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if popover.isShown {
             popover.performClose(nil)
         }
-        let menu = menuBuilder.build(isLoggedIn: store.viewState != .loggedOut)
+        let menu = menuBuilder.build(
+            isLoggedIn: store.viewState != .loggedOut,
+            canCheckForUpdates: updater.canCheckForUpdates
+        )
         statusItem.menu = menu
         button.performClick(nil)
         statusItem.menu = nil
@@ -163,6 +171,14 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     @objc private func refreshNow() {
         scheduler.triggerNow(manual: true)
+    }
+
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
+    }
+
+    @objc private func showAbout() {
+        updater.showAboutPanel()
     }
 
     @objc private func openCursor() {

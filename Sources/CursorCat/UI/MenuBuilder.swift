@@ -35,6 +35,8 @@ enum InteractionMenuAction: Int, CaseIterable {
 final class ActionsMenuBuilder {
     weak var target: AnyObject?
     let refreshSelector: Selector
+    let checkForUpdatesSelector: Selector
+    let aboutSelector: Selector
     let openCursorSelector: Selector
     let openCloudAgentsSelector: Selector
     let openStatusSelector: Selector
@@ -43,6 +45,8 @@ final class ActionsMenuBuilder {
 
     init(target: AnyObject,
          refreshSelector: Selector,
+         checkForUpdatesSelector: Selector,
+         aboutSelector: Selector,
          openCursorSelector: Selector,
          openCloudAgentsSelector: Selector,
          openStatusSelector: Selector,
@@ -50,6 +54,8 @@ final class ActionsMenuBuilder {
          interactSelector: Selector) {
         self.target = target
         self.refreshSelector = refreshSelector
+        self.checkForUpdatesSelector = checkForUpdatesSelector
+        self.aboutSelector = aboutSelector
         self.openCursorSelector = openCursorSelector
         self.openCloudAgentsSelector = openCloudAgentsSelector
         self.openStatusSelector = openStatusSelector
@@ -57,7 +63,7 @@ final class ActionsMenuBuilder {
         self.interactSelector = interactSelector
     }
 
-    func build(isLoggedIn: Bool) -> NSMenu {
+    func build(isLoggedIn: Bool, canCheckForUpdates: Bool) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
@@ -78,7 +84,20 @@ final class ActionsMenuBuilder {
         refresh.target = target
         menu.addItem(refresh)
 
+        let checkForUpdates = NSMenuItem(title: "Check for Updates…",
+                                         action: checkForUpdatesSelector,
+                                         keyEquivalent: "")
+        checkForUpdates.target = target
+        checkForUpdates.isEnabled = canCheckForUpdates
+        menu.addItem(checkForUpdates)
+
         menu.addItem(.separator())
+
+        let about = NSMenuItem(title: "About CursorCat",
+                               action: aboutSelector,
+                               keyEquivalent: "")
+        about.target = target
+        menu.addItem(about)
 
         let cloud = NSMenuItem(title: "Cloud Agents",
                                action: openCloudAgentsSelector,

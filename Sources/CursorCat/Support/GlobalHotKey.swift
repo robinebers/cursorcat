@@ -148,7 +148,7 @@ final class GlobalHotKeyController {
             &eventHandlerRef
         )
         if status != noErr {
-            settings.globalShortcutRegistrationError = "Global shortcut handler could not be installed."
+            settings.globalShortcutRegistrationError = "CursorCat couldn’t set up the keyboard shortcut."
         }
     }
 

@@ -6,6 +6,11 @@ name = "cursorcat"
 script = ""
 
 [[actions]]
-name = "Run"
+name = "Build and Run"
 icon = "run"
 command = "./script/build_and_run.sh"
+
+[[actions]]
+name = "Build and Package"
+icon = "package"
+command = "./script/package_release.sh app"
