@@ -17,7 +17,7 @@ final class AppContainer {
         let store = UsageStore(settings: settings)
         let animator = CatAnimator()
         let behavior = CatBehavior(animator: animator, store: store)
-        let scheduler = PollScheduler(api: api, store: store)
+        let scheduler = PollScheduler(auth: auth, api: api, store: store)
         let controller = StatusItemController(
             store: store,
             settings: settings,

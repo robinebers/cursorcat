@@ -3,7 +3,6 @@ import SwiftUI
 struct DashboardActions {
     var refresh: () -> Void
     var openCursor: () -> Void
-    var quit: () -> Void
 }
 
 struct DashboardView: View {

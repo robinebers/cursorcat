@@ -6,12 +6,15 @@ import AppKit
 final class PollScheduler: ObservableObject {
     private let normalInterval: TimeInterval = 300  // 5 min
     private let backoffInterval: TimeInterval = 900 // 15 min
+    private let authMonitorInterval: TimeInterval = 15
     private let wakeDebounce: TimeInterval = 3
 
+    private let auth: CursorAuth
     private let api: CursorAPI
     private let store: UsageStore
 
     private var timer: DispatchSourceTimer?
+    private var authMonitorTimer: DispatchSourceTimer?
     private var consecutiveFailures = 0
     private var wakeWorkItem: DispatchWorkItem?
 
@@ -19,13 +22,15 @@ final class PollScheduler: ObservableObject {
     @Published private(set) var manualRefreshLockedUntil: Date?
     @Published private(set) var isRefreshing = false
 
-    init(api: CursorAPI, store: UsageStore) {
+    init(auth: CursorAuth, api: CursorAPI, store: UsageStore) {
+        self.auth = auth
         self.api = api
         self.store = store
     }
 
     func start() {
         scheduleTimer(interval: normalInterval)
+        startAuthMonitor()
 
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
@@ -41,6 +46,13 @@ final class PollScheduler: ObservableObject {
     func triggerNow(manual: Bool = false) {
         let now = Date()
         if manual {
+            if store.viewState == .loggedOut {
+                Task {
+                    await auth.invalidate()
+                    await self.runOnce()
+                }
+                return
+            }
             guard canTriggerManualRefresh(at: now) else {
                 return
             }
@@ -78,6 +90,40 @@ final class PollScheduler: ObservableObject {
         let item = DispatchWorkItem { [weak self] in self?.triggerNow() }
         wakeWorkItem = item
         DispatchQueue.main.asyncAfter(deadline: .now() + wakeDebounce, execute: item)
+    }
+
+    private func startAuthMonitor() {
+        authMonitorTimer?.cancel()
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(
+            deadline: .now() + authMonitorInterval,
+            repeating: authMonitorInterval,
+            leeway: .seconds(2)
+        )
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            Task { await self.reconcileLocalAuthState() }
+        }
+        timer.resume()
+        authMonitorTimer = timer
+    }
+
+    private func reconcileLocalAuthState() async {
+        let state = await auth.loadAuthState(forceReload: true)
+        let hasLocalAuth = state.accessToken != nil || state.refreshToken != nil
+
+        if !hasLocalAuth {
+            await auth.invalidate()
+            if store.viewState != .loggedOut {
+                store.setLoggedOut()
+            }
+            return
+        }
+
+        if store.viewState == .loggedOut && !isRefreshing {
+            await auth.invalidate()
+            await runOnce()
+        }
     }
 
     private func runOnce() async {

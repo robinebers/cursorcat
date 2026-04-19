@@ -24,7 +24,7 @@ struct LoggedOutCard: View {
                     .font(.title3)
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity, alignment: .center)
-                Text("Once signed in, CursorCat keeps track of your spending, model activity, and remaining subscription limits.")
+                Text("Once signed in, CursorCat keeps track of your spending and model activity.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -37,16 +37,17 @@ struct LoggedOutCard: View {
                     Text("Open Cursor to log in")
                         .frame(maxWidth: .infinity)
                 }
-                    .buttonStyle(.glassProminent)
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity)
-                Button(action: actions.quit) {
-                    Text("Quit")
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+
+                Button(action: actions.refresh) {
+                    Text("Try again")
                         .frame(maxWidth: .infinity)
                 }
-                    .buttonStyle(.glass)
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity)
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity)
         }

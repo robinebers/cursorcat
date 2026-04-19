@@ -83,13 +83,11 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private func makeDashboardActions() -> DashboardActions {
         DashboardActions(
             refresh: { [weak self] in
-                self?.scheduler.triggerNow(manual: true)
+                guard let self else { return }
+                self.scheduler.triggerNow(manual: self.store.viewState != .loggedOut)
             },
             openCursor: { [weak self] in
                 self?.openCursorAndDismiss()
-            },
-            quit: {
-                NSApplication.shared.terminate(nil)
             }
         )
     }
@@ -165,7 +163,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     // MARK: - Actions
 
     @objc private func refreshNow() {
-        scheduler.triggerNow(manual: true)
+        scheduler.triggerNow(manual: store.viewState != .loggedOut)
     }
 
     @objc private func openCursor() {
