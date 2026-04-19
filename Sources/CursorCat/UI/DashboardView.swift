@@ -13,6 +13,7 @@ struct DashboardView: View {
     @ObservedObject var settings: UserSettings
     @ObservedObject var scheduler: PollScheduler
     @ObservedObject var updater: AppUpdater
+    @ObservedObject var presentation: DashboardPresentationState
     let actions: DashboardActions
 
     var body: some View {
@@ -30,6 +31,7 @@ struct DashboardView: View {
                     settings: settings,
                     scheduler: scheduler,
                     updater: updater,
+                    presentation: presentation,
                     actions: actions
                 )
             }
@@ -37,5 +39,6 @@ struct DashboardView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(width: Self.width)
+        .environmentObject(presentation)
     }
 }

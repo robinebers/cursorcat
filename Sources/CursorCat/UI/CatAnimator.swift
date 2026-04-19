@@ -30,10 +30,12 @@ enum CatAnimation {
 /// - External `setState(_:)` can lock the cat to a pose (sleeping for
 ///   logged-out, tired for error).
 /// - External `play(_:)` can trigger a one-shot animation from the menu.
-/// Ticks run at 100 ms so durations match the reference implementation.
+/// Idle breathing is scheduled sparsely; one-shot animations still tick at
+/// 100 ms so the reference motion stays intact.
 @MainActor
 final class CatAnimator {
-    private let tickInterval: TimeInterval = 0.1
+    private let animationTickInterval: TimeInterval = 0.1
+    private let idleBreathInterval: TimeInterval = 4.5
 
     // Sleep tunables. Long, slow breathing — barely noticeable frame swap.
     // Each tick is 100 ms.
@@ -54,20 +56,17 @@ final class CatAnimator {
     private let yawnBeatTicks = 5             //  0.5 s holding tired
     private let yawnGapTicks = 20             //  2 s back to idle
 
-    // Idle breathing: flip a 1-source-pixel vertical offset every N ticks.
-    private let breathHoldTicks = 45          //  4.5 s per breath phase
-
     private var timer: Timer?
     private var state: CatState = .idle
     private var animation: CatAnimation?
     private var animationFrame = 0
-    private var breathTick = 0
+    private var breathLifted = false
 
     var onFrame: ((NSImage) -> Void)?
 
     func start() {
         emit()
-        scheduleTimer()
+        scheduleNextTick()
     }
 
     func stop() {
@@ -82,7 +81,9 @@ final class CatAnimator {
         state = newState
         animation = nil
         animationFrame = 0
+        breathLifted = false
         emit()
+        scheduleNextTick()
     }
 
     /// Trigger a one-shot animation. Interrupts any current idle animation,
@@ -91,24 +92,40 @@ final class CatAnimator {
         state = .idle
         animation = kind
         animationFrame = 0
+        breathLifted = false
         advance()
+        scheduleNextTick()
     }
 
     // MARK: - Ticking
 
-    private func scheduleTimer() {
+    private func scheduleTimer(after interval: TimeInterval) {
         timer?.invalidate()
-        let t = Timer(timeInterval: tickInterval, repeats: true) { [weak self] _ in
+        let t = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
     }
 
+    private func scheduleNextTick() {
+        timer?.invalidate()
+        timer = nil
+
+        guard state == .idle else { return }
+
+        if animation == nil {
+            scheduleTimer(after: idleBreathInterval)
+        } else {
+            scheduleTimer(after: animationTickInterval)
+        }
+    }
+
     private func tick() {
         // Pose-locked states don't animate.
         guard state == .idle else { return }
         advance()
+        scheduleNextTick()
     }
 
     /// Emit the current animation frame and advance (or end) the animation.
@@ -194,19 +211,16 @@ final class CatAnimator {
     }
 
     private func emitIdleBreath() {
-        // Alternate between the resting pose and a "shoulder lift" pose where
-        // rows above the torso sit 1 px higher. Paws and sitting body stay
-        // planted across both phases.
-        breathTick += 1
-        if breathTick >= breathHoldTicks * 2 { breathTick = 0 }
-        let lifted = breathTick >= breathHoldTicks
         onFrame?(CatRenderer.image(for: CatRenderer.Cell.idle,
-                                   breathLifted: lifted))
+                                   breathLifted: breathLifted))
+        breathLifted.toggle()
     }
 
     private func resetAnimation() {
         animation = nil
         animationFrame = 0
+        breathLifted = false
+        emitIdleBreath()
     }
 
     // MARK: - Sprite emission

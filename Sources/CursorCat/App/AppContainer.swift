@@ -8,6 +8,7 @@ final class AppContainer {
     let behavior: CatBehavior
     let scheduler: PollScheduler
     let updater: AppUpdater
+    let presentation: DashboardPresentationState
     let controller: StatusItemController
     let hotKeyController: GlobalHotKeyController
 
@@ -20,12 +21,14 @@ final class AppContainer {
         let behavior = CatBehavior(animator: animator, store: store)
         let scheduler = PollScheduler(auth: auth, api: api, store: store)
         let updater = AppUpdater()
+        let presentation = DashboardPresentationState()
         let controller = StatusItemController(
             store: store,
             settings: settings,
             animator: animator,
             scheduler: scheduler,
-            updater: updater
+            updater: updater,
+            presentation: presentation
         )
         let hotKeyController = GlobalHotKeyController(settings: settings) {
             controller.togglePopoverFromHotKey()
@@ -37,6 +40,7 @@ final class AppContainer {
         self.behavior = behavior
         self.scheduler = scheduler
         self.updater = updater
+        self.presentation = presentation
         self.controller = controller
         self.hotKeyController = hotKeyController
     }

@@ -13,8 +13,8 @@ import Foundation
 /// - `resting` — today's imputed spend unchanged. Cat cycles through
 ///               yawn / short nap roughly once a minute.
 ///
-/// Pre-schedules N random event times per non-plain window and a 1 Hz
-/// ticker pops them into `CatAnimator.play(_:)`.
+/// Pre-schedules N random event times per non-plain window and arms a timer
+/// only for the next due event.
 @MainActor
 final class CatBehavior {
     private let animator: CatAnimator
@@ -32,7 +32,7 @@ final class CatBehavior {
     private var previousToday: Int?
     private var phase: Phase = .plain
     private var queue: [Date] = []
-    private var ticker: Timer?
+    private var nextEventTimer: Timer?
     private var cancellable: AnyCancellable?
 
     init(animator: CatAnimator, store: UsageStore) {
@@ -50,8 +50,8 @@ final class CatBehavior {
     }
 
     func stop() {
-        ticker?.invalidate()
-        ticker = nil
+        nextEventTimer?.invalidate()
+        nextEventTimer = nil
         cancellable = nil
         queue.removeAll()
     }
@@ -61,6 +61,8 @@ final class CatBehavior {
     private func onSnapshot(_ snapshot: UsageSnapshot) {
         guard snapshot.isLoggedIn else {
             queue.removeAll()
+            nextEventTimer?.invalidate()
+            nextEventTimer = nil
             previousToday = nil
             Log.ui.info("CatBehavior: logged out — scheduling paused")
             return
@@ -98,6 +100,8 @@ final class CatBehavior {
 
     private func rescheduleEvents() {
         queue.removeAll()
+        nextEventTimer?.invalidate()
+        nextEventTimer = nil
         guard phase != .plain else { return }
 
         let now = Date()
@@ -105,17 +109,27 @@ final class CatBehavior {
             TimeInterval.random(in: 0..<pollWindow)
         }
         queue = offsets.map { now.addingTimeInterval($0) }.sorted()
+        scheduleNextEventTimer()
     }
 
     // MARK: - Ticking
 
     private func scheduleTicker() {
-        ticker?.invalidate()
-        let t = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+        scheduleNextEventTimer()
+    }
+
+    private func scheduleNextEventTimer() {
+        nextEventTimer?.invalidate()
+        nextEventTimer = nil
+
+        guard let next = queue.first else { return }
+
+        let delay = max(0, next.timeIntervalSinceNow)
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
-        RunLoop.main.add(t, forMode: .common)
-        ticker = t
+        RunLoop.main.add(timer, forMode: .common)
+        nextEventTimer = timer
     }
 
     private func tick() {
@@ -127,6 +141,7 @@ final class CatBehavior {
             Log.ui.info("CatBehavior: firing \(self.describe(pick))")
             animator.play(pick)
         }
+        scheduleNextEventTimer()
     }
 
     private func pickForCurrentPhase() -> CatAnimation {

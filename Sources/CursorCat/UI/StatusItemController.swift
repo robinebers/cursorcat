@@ -14,6 +14,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let animator: CatAnimator
     private let scheduler: PollScheduler
     private let updater: AppUpdater
+    private let presentation: DashboardPresentationState
     private let popover: NSPopover
     private var eventMonitor: EventMonitor?
     private var cancellables: Set<AnyCancellable> = []
@@ -34,13 +35,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
          settings: UserSettings,
          animator: CatAnimator,
          scheduler: PollScheduler,
-         updater: AppUpdater) {
+         updater: AppUpdater,
+         presentation: DashboardPresentationState) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.store = store
         self.settings = settings
         self.animator = animator
         self.scheduler = scheduler
         self.updater = updater
+        self.presentation = presentation
         self.popover = NSPopover()
         super.init()
 
@@ -63,6 +66,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
                 settings: settings,
                 scheduler: scheduler,
                 updater: updater,
+                presentation: presentation,
                 actions: makeDashboardActions()
             )
         )
@@ -159,6 +163,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.show(relativeTo: button.bounds,
                      of: button,
                      preferredEdge: .minY)
+        presentation.isPopoverVisible = true
         NSApp.activate(ignoringOtherApps: true)
         popover.contentViewController?.view.window?.makeKey()
         startEventMonitor()
@@ -234,6 +239,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     func popoverWillClose(_ notification: Notification) {
+        presentation.isPopoverVisible = false
         eventMonitor?.stop()
         eventMonitor = nil
     }

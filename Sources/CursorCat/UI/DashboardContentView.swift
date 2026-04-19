@@ -6,6 +6,7 @@ struct DashboardContent: View {
     @ObservedObject var settings: UserSettings
     @ObservedObject var scheduler: PollScheduler
     @ObservedObject var updater: AppUpdater
+    @ObservedObject var presentation: DashboardPresentationState
     let actions: DashboardActions
 
     @State private var selectedTab: DashboardTab = .overview
@@ -34,7 +35,12 @@ struct DashboardContent: View {
             }
 
             Divider()
-            DashboardFooter(plan: snapshot.plan, scheduler: scheduler, refresh: actions.refresh)
+            DashboardFooter(
+                plan: snapshot.plan,
+                scheduler: scheduler,
+                isVisible: presentation.isPopoverVisible,
+                refresh: actions.refresh
+            )
         }
         .background(
             DashboardKeyboardShortcuts(
@@ -90,6 +96,7 @@ private struct UpdateInstallButton: View {
 
 private struct OverviewTabContent: View {
     let snapshot: UsageSnapshot
+    @EnvironmentObject private var presentation: DashboardPresentationState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -101,7 +108,10 @@ private struct OverviewTabContent: View {
                 QuotasSection(snapshot: snapshot)
             }
             if let resetsAt = snapshot.billingCycleResetsAt {
-                SubscriptionResetText(resetsAt: resetsAt)
+                SubscriptionResetText(
+                    resetsAt: resetsAt,
+                    isVisible: presentation.isPopoverVisible
+                )
             }
         }
     }
@@ -159,49 +169,73 @@ private struct QuotasSection: View {
 
 private struct SubscriptionResetText: View {
     let resetsAt: Date
+    let isVisible: Bool
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            Text("Your subscription resets in \(Countdown.format(resetsAt: resetsAt, now: context.date))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .center)
+        Group {
+            if isVisible {
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    bodyContent(now: context.date)
+                }
+            } else {
+                bodyContent(now: Date())
+            }
         }
+    }
+
+    @ViewBuilder
+    private func bodyContent(now: Date) -> some View {
+        Text("Your subscription resets in \(Countdown.format(resetsAt: resetsAt, now: now))")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
 private struct DashboardFooter: View {
     let plan: String?
     @ObservedObject var scheduler: PollScheduler
+    let isVisible: Bool
     let refresh: () -> Void
 
     @State private var refreshSpins: Int = 0
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            HStack(alignment: .center) {
-                if let plan {
-                    PlanPill(plan: plan)
+        Group {
+            if isVisible {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    bodyContent(now: context.date)
                 }
-                Spacer(minLength: 8)
-                Text(refreshStatus(now: context.date))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                Button {
-                    refreshSpins += 1
-                    refresh()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .symbolEffect(.rotate, value: refreshSpins)
-                }
-                .buttonStyle(.plain)
-                .help("Refresh now")
-                .accessibilityLabel("Refresh")
-                .disabled(isRefreshDisabled(now: context.date))
+            } else {
+                bodyContent(now: Date())
             }
+        }
+    }
+
+    @ViewBuilder
+    private func bodyContent(now: Date) -> some View {
+        HStack(alignment: .center) {
+            if let plan {
+                PlanPill(plan: plan)
+            }
+            Spacer(minLength: 8)
+            Text(refreshStatus(now: now))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            Button {
+                refreshSpins += 1
+                refresh()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .symbolEffect(.rotate, value: refreshSpins)
+            }
+            .buttonStyle(.plain)
+            .help("Refresh now")
+            .accessibilityLabel("Refresh")
+            .disabled(isRefreshDisabled(now: now))
         }
     }
 
