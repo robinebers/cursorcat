@@ -1,8 +1,8 @@
-Cursorcat includes or adapts material from the following projects:
+CursorCat includes or adapts material from the following projects:
 
 1. adryd325/oneko.js
    Repo: https://github.com/adryd325/oneko.js
-   Use in this repo: bundled sprite sheet at Sources/Cursorcat/Resources/oneko.gif
+   Use in this repo: bundled sprite sheet at Sources/CursorCat/Resources/oneko.gif
    License: MIT
 
    Copyright (c) 2022 adryd

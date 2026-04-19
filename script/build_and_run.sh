@@ -17,6 +17,8 @@ APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 RESOURCE_BUNDLE_NAME="${APP_NAME}_${APP_NAME}.bundle"
+ICON_ICNS="$ROOT_DIR/Resources/AppIcon/AppIcon.icns"
+ICON_ASSET_CAR="$ROOT_DIR/Resources/AppIcon/Assets.car"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -39,6 +41,12 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME"
+if [ -f "$ICON_ICNS" ]; then
+  cp "$ICON_ICNS" "$APP_RESOURCES/AppIcon.icns"
+fi
+if [ -f "$ICON_ASSET_CAR" ]; then
+  cp "$ICON_ASSET_CAR" "$APP_RESOURCES/Assets.car"
+fi
 chmod +x "$APP_BINARY"
 
 cat >"$INFO_PLIST" <<PLIST
@@ -56,6 +64,10 @@ cat >"$INFO_PLIST" <<PLIST
   <string>APPL</string>
   <key>CFBundleDisplayName</key>
   <string>$APP_NAME</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
+  <key>CFBundleIconName</key>
+  <string>AppIcon</string>
   <key>CFBundleShortVersionString</key>
   <string>$APP_VERSION</string>
   <key>CFBundleVersion</key>
@@ -89,7 +101,7 @@ if [ -z "$CODESIGN_IDENTITY" ]; then
     | /usr/bin/awk -F\" '/Apple Development:/ { print $2; exit }')
 fi
 
-ENTITLEMENTS="$ROOT_DIR/script/Cursorcat.dev.entitlements.plist"
+ENTITLEMENTS="$ROOT_DIR/script/CursorCat.dev.entitlements.plist"
 
 if [ -n "$CODESIGN_IDENTITY" ]; then
   /usr/bin/codesign \

@@ -23,7 +23,7 @@
 		79ADC9801545C2041497FD3F /* DashboardRPC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DFECB47B0604FCA0EE84796 /* DashboardRPC.swift */; };
 		7FF2462392A063CC9570015D /* PollScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FE181A74E3FA4ABEF65A8B9 /* PollScheduler.swift */; };
 		95D13408E5BBB554EB867100 /* StripeAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67A92D93FA6F9939EEA35C19 /* StripeAPI.swift */; };
-		9701D541BDB9292CC11358D8 /* CursorcatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AC325B0F52933B0D96E5D85 /* CursorcatApp.swift */; };
+		9701D541BDB9292CC11358D8 /* CursorCatApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AC325B0F52933B0D96E5D85 /* CursorCatApp.swift */; };
 		99B84FE25844E265FF97EA6C /* CursorAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3191CDF14B8A595FA08EDC1C /* CursorAPI.swift */; };
 		9CAE7BDC7D6587538C6B6854 /* CursorKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2540FB48C75A4635BDD0238 /* CursorKeychain.swift */; };
 		9FF41624B32B71E3E5705583 /* UsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50B1680953CB3108B70A0936 /* UsageStore.swift */; };
@@ -65,7 +65,7 @@
 		50B1680953CB3108B70A0936 /* UsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStore.swift; sourceTree = "<group>"; };
 		52C63067A894F05BC2B5A7C1 /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
 		5920A32104E15687834B27FA /* oneko.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = oneko.gif; sourceTree = "<group>"; };
-		5AC325B0F52933B0D96E5D85 /* CursorcatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorcatApp.swift; sourceTree = "<group>"; };
+		5AC325B0F52933B0D96E5D85 /* CursorCatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorCatApp.swift; sourceTree = "<group>"; };
 		61F3BC7A7396B9C3664EB997 /* model_manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = model_manifest.json; sourceTree = "<group>"; };
 		67A92D93FA6F9939EEA35C19 /* StripeAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StripeAPI.swift; sourceTree = "<group>"; };
 		6A3F03C6B0419447EB588ECF /* DashboardModelsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModelsView.swift; sourceTree = "<group>"; };
@@ -137,7 +137,7 @@
 			path = Auth;
 			sourceTree = "<group>";
 		};
-		5142049CA6A1699B7E4A0835 /* Cursorcat */ = {
+		5142049CA6A1699B7E4A0835 /* CursorCat */ = {
 			isa = PBXGroup;
 			children = (
 				236E2ACAE16316B417646072 /* API */,
@@ -148,14 +148,14 @@
 				ACD259DBB56341511776A8DD /* Support */,
 				AAD658B25E1494D07F8530DE /* UI */,
 			);
-			path = Cursorcat;
+			path = CursorCat;
 			sourceTree = "<group>";
 		};
 		875412D2C1570AA5E68B3B19 /* App */ = {
 			isa = PBXGroup;
 			children = (
 				FADE7ECB48598E9180B478C0 /* AppContainer.swift */,
-				5AC325B0F52933B0D96E5D85 /* CursorcatApp.swift */,
+				5AC325B0F52933B0D96E5D85 /* CursorCatApp.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -171,7 +171,7 @@
 		98E487FBD27CB4118CD7D5AC /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				5142049CA6A1699B7E4A0835 /* Cursorcat */,
+				5142049CA6A1699B7E4A0835 /* CursorCat */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -316,7 +316,7 @@
 				C764CDB961756CC3F4A6C850 /* CursorAuth.swift in Sources */,
 				9CAE7BDC7D6587538C6B6854 /* CursorKeychain.swift in Sources */,
 				A4894425097DB550FF1E2B82 /* CursorSQLite.swift in Sources */,
-				9701D541BDB9292CC11358D8 /* CursorcatApp.swift in Sources */,
+				9701D541BDB9292CC11358D8 /* CursorCatApp.swift in Sources */,
 				A06E261C36F5141C624DDB59 /* DashboardComponents.swift in Sources */,
 				C9275AA0432BB7901D9B03BA /* DashboardContentView.swift in Sources */,
 				53D4768D56A0000762EFFBA1 /* DashboardHeaderView.swift in Sources */,
@@ -400,7 +400,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_ENTITLEMENTS = script/Cursorcat.dev.entitlements.plist;
+				CODE_SIGN_ENTITLEMENTS = script/CursorCat.dev.entitlements.plist;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -473,7 +473,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_ENTITLEMENTS = script/Cursorcat.dev.entitlements.plist;
+				CODE_SIGN_ENTITLEMENTS = script/CursorCat.dev.entitlements.plist;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;

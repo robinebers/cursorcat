@@ -11,6 +11,8 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-notarytool-profile}"
 RESOURCE_BUNDLE_NAME="${APP_NAME}_${APP_NAME}.bundle"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ICON_ICNS="$ROOT_DIR/Resources/AppIcon/AppIcon.icns"
+ICON_ASSET_CAR="$ROOT_DIR/Resources/AppIcon/Assets.car"
 DIST_DIR="$ROOT_DIR/dist/release"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
@@ -87,6 +89,10 @@ write_info_plist() {
   <string>$APP_NAME</string>
   <key>CFBundleExecutable</key>
   <string>$APP_NAME</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
+  <key>CFBundleIconName</key>
+  <string>AppIcon</string>
   <key>CFBundleIdentifier</key>
   <string>$BUNDLE_ID</string>
   <key>CFBundleName</key>
@@ -118,6 +124,12 @@ assemble_app() {
   cp "$BUILD_BINARY" "$APP_BINARY"
   chmod +x "$APP_BINARY"
   cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME"
+  if [ -f "$ICON_ICNS" ]; then
+    cp "$ICON_ICNS" "$APP_RESOURCES/AppIcon.icns"
+  fi
+  if [ -f "$ICON_ASSET_CAR" ]; then
+    cp "$ICON_ASSET_CAR" "$APP_RESOURCES/Assets.car"
+  fi
   write_info_plist
 }
 

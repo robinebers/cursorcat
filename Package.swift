@@ -12,7 +12,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "CursorCat",
-            path: "Sources/Cursorcat",
+            path: "Sources/CursorCat",
             resources: [
                 .process("Resources")
             ],
@@ -21,9 +21,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "CursorcatTests",
+            name: "CursorCatTests",
             dependencies: ["CursorCat"],
-            path: "Tests/CursorcatTests"
+            path: "Tests/CursorCatTests"
         )
     ]
 )
