@@ -1,6 +1,6 @@
 # CursorCat 🐈‍⬛
 
-![CursorCat models view](./assets/readme/cursorcat-models.jpg)
+![CursorCat menu bar and models view](./assets/readme/cursorcat.jpg)
 
 CursorCat is a tiny Mac app that lives in your menu bar and shows you how much you’re spending on Cursor today, with a little animated cat for company. No more popping open the Cursor website to check where you’re at, and a quick glance up at your menu bar tells you everything.
 
@@ -27,7 +27,7 @@ A few things to keep in mind before you rely on this:
 
 ## Requirements
 
-- A Mac running macOS 26 (Tahoe) or newer
+- A Mac running macOS 15 (Sequoia) or newer
 - Cursor already installed and signed in on your Mac
 
 ## Is This Official?

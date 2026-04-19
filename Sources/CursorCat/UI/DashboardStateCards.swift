@@ -31,7 +31,7 @@ struct FailedCard: View {
                 Text("Try Again")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glass)
+            .cursorGlassButtonStyle()
             .controlSize(.large)
             .frame(maxWidth: .infinity)
         }
@@ -61,7 +61,7 @@ struct LoggedOutCard: View {
                     Text("Open Cursor to log in")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glassProminent)
+                .cursorGlassButtonStyle(prominent: true)
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
 
@@ -69,7 +69,7 @@ struct LoggedOutCard: View {
                     Text("Try again")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glass)
+                .cursorGlassButtonStyle()
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
             }

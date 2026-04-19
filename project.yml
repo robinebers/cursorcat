@@ -3,7 +3,7 @@ name: CursorCat
 options:
   createIntermediateGroups: true
   deploymentTarget:
-    macOS: "26.0"
+    macOS: "15.0"
 
 settings:
   base:
@@ -29,7 +29,7 @@ targets:
   CursorCat:
     type: application
     platform: macOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "15.0"
     sources:
       - path: Sources/CursorCat
         excludes:

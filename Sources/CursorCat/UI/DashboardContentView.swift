@@ -86,7 +86,7 @@ private struct UpdateInstallButton: View {
                     .frame(maxWidth: .infinity)
             }
         }
-        .buttonStyle(.glassProminent)
+        .cursorGlassButtonStyle(prominent: true)
         .controlSize(.large)
         .frame(maxWidth: .infinity)
         .disabled(!state.isInstallEnabled)

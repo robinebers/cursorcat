@@ -4,7 +4,7 @@ set -euo pipefail
 MODE="${1:-run}"
 APP_NAME="CursorCat"
 BUNDLE_ID="com.sunstory.cursorcat"
-MIN_SYSTEM_VERSION="26.0"
+MIN_SYSTEM_VERSION="15.0"
 APP_VERSION="0.1.0"
 APP_BUILD="1"
 DEFAULT_SPARKLE_FEED_URL="https://github.com/robinebers/cursorcat/releases/latest/download/appcast.xml"

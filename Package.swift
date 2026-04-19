@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "CursorCat",
     platforms: [
-        .macOS(.v26)
+        .macOS(.v15)
     ],
     products: [
         .executable(name: "CursorCat", targets: ["CursorCat"])

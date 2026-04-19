@@ -126,6 +126,29 @@ struct PlanPill: View {
     }
 }
 
+/// Applies the Liquid Glass button style on macOS 26+ and falls back
+/// to the standard bordered button styles on earlier releases. The
+/// system automatically redraws `.bordered` controls with Liquid Glass
+/// on Tahoe, so the fallback still looks native on newer macOS.
+extension View {
+    @ViewBuilder
+    func cursorGlassButtonStyle(prominent: Bool = false) -> some View {
+        if #available(macOS 26.0, *) {
+            if prominent {
+                self.buttonStyle(.glassProminent)
+            } else {
+                self.buttonStyle(.glass)
+            }
+        } else {
+            if prominent {
+                self.buttonStyle(.borderedProminent)
+            } else {
+                self.buttonStyle(.bordered)
+            }
+        }
+    }
+}
+
 /// Compact error banner surfaced above the dashboard rows. Monochrome;
 /// the triangle glyph carries the semantic — no red tint.
 struct ErrorBanner: View {
