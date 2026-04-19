@@ -1,21 +1,16 @@
 import SwiftUI
 
 struct DashboardHeaderView: View {
-    let today: Int?
-    let yesterday: Int?
+    @Binding var selectedRange: DashboardRange
+    let summary: DashboardRangeSummary?
 
     var body: some View {
-        VStack(spacing: 2) {
-            Text("Today's spend")
-                .font(.caption2)
-                .fontWeight(.medium)
-                .textCase(.uppercase)
-                .tracking(0.8)
-                .foregroundStyle(.secondary)
+        VStack(spacing: 10) {
+            rangePicker
 
             VStack(spacing: 0) {
-                if let today {
-                    Text(Money.format(cents: today))
+                if let summary {
+                    Text(Money.format(cents: summary.totalCents))
                         .font(.system(size: 34,
                                       weight: .semibold,
                                       design: .rounded))
@@ -26,22 +21,50 @@ struct DashboardHeaderView: View {
                         .padding(.vertical, 8)
                 }
 
-                if let today,
-                   let yesterday {
-                    DeltaRow(today: today, yesterday: yesterday)
+                if let summary {
+                    DeltaRow(summary: summary)
                 }
             }
         }
         .frame(maxWidth: .infinity)
     }
+
+    private var rangePicker: some View {
+        Menu {
+            ForEach(DashboardRange.allCases) { range in
+                Button {
+                    selectedRange = range
+                } label: {
+                    Text(range.title)
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Text(selectedRange.title)
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(.quaternary)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+    }
 }
 
 private struct DeltaRow: View {
-    let today: Int
-    let yesterday: Int
+    let summary: DashboardRangeSummary
 
     var body: some View {
-        let diff = today - yesterday
+        let diff = summary.totalCents - summary.comparisonCents
         if diff == 0 {
             EmptyView()
         } else {
@@ -50,11 +73,11 @@ private struct DeltaRow: View {
                     .rotationEffect(.degrees(diff > 0 ? 0 : 180))
                     .font(.system(size: 8))
                     .foregroundStyle(tint)
-                Text(Money.formatCompact(cents: abs(diff)))
+                Text(Money.format(cents: abs(diff)))
                     .font(.callout)
                     .monospacedDigit()
                     .foregroundStyle(tint)
-                Text("vs. yesterday")
+                Text(summary.comparisonLabel)
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -62,6 +85,6 @@ private struct DeltaRow: View {
     }
 
     private var tint: Color {
-        today > yesterday ? .red : .green
+        summary.totalCents > summary.comparisonCents ? .red : .green
     }
 }

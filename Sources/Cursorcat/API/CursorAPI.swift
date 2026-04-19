@@ -48,9 +48,10 @@ actor CursorAPI {
         return parts.joined(separator: "\n\n")
     }
 
-    /// Fetch RPC trio first so we know the billing cycle start, then fetch CSV
-    /// covering cycleStart → now. Falls back to trailing 31 days if the RPC
-    /// doesn't return a usable cycle window.
+    /// Fetch RPC trio first so we know the current and previous billing-cycle
+    /// bounds, then fetch enough CSV to cover the shared dashboard ranges and
+    /// comparisons. Falls back to trailing 63 days if the RPC doesn't return a
+    /// usable cycle window.
     func fetchSnapshot() async throws -> APISnapshot {
         return try await retryingOnAuth {
             let token = try await self.auth.accessToken()
@@ -96,8 +97,8 @@ actor CursorAPI {
         }
     }
 
-    /// CSV window: from the billing cycle start (if known and within 60 days)
-    /// to end-of-today, else trailing 31 days.
+    /// CSV window: from the previous billing cycle start (if known and within
+    /// 63 days) to end-of-today, else trailing 63 days.
     static func csvWindow(usage: GetCurrentPeriodUsageResponse?,
                           now: Date = Date(),
                           calendar: Calendar = .current) -> (Date, Date) {
@@ -105,15 +106,23 @@ actor CursorAPI {
         let endOfToday = calendar.date(byAdding: .day, value: 1, to: startOfToday)?
             .addingTimeInterval(-1) ?? now
 
-        let fallbackStart = calendar.date(byAdding: .day, value: -31, to: startOfToday)
+        let fallbackStart = calendar.date(byAdding: .day, value: -63, to: startOfToday)
             ?? startOfToday
 
         guard let cycleStart = usage?.billingCycleStart?.asUnixMillisDate else {
             return (fallbackStart, endOfToday)
         }
-        // Reject absurd or very old cycle starts (>60 days) to avoid a huge CSV.
-        let earliest = calendar.date(byAdding: .day, value: -60, to: startOfToday) ?? startOfToday
-        let start = cycleStart < earliest ? fallbackStart : cycleStart
+
+        let cycleEnd = usage?.billingCycleEnd?.asUnixMillisDate
+        let billingCycleWindow = BillingCycleWindow.resolve(
+            start: cycleStart,
+            end: cycleEnd,
+            now: now,
+            calendar: calendar
+        )
+
+        let earliest = calendar.date(byAdding: .day, value: -63, to: startOfToday) ?? startOfToday
+        let start = billingCycleWindow.previousStart < earliest ? fallbackStart : billingCycleWindow.previousStart
         return (start, endOfToday)
     }
 }

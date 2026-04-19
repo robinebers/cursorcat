@@ -1,36 +1,34 @@
 import Foundation
 
-enum DashboardTab: String, CaseIterable, Identifiable {
-    case overview
-    case models
-    case settings
+struct BillingCycleWindow: Equatable {
+    let currentStart: Date
+    let previousStart: Date
 
-    var id: String { rawValue }
+    static func resolve(
+        start: Date?,
+        end: Date?,
+        now: Date,
+        calendar: Calendar
+    ) -> BillingCycleWindow {
+        let startOfToday = calendar.startOfDay(for: now)
+        let fallbackCurrentStart = calendar.date(byAdding: .day, value: -31, to: startOfToday) ?? startOfToday
+        let fallbackPreviousStart = calendar.date(byAdding: .day, value: -31, to: fallbackCurrentStart) ?? fallbackCurrentStart
 
-    var title: String {
-        switch self {
-        case .overview: return "Overview"
-        case .models: return "Models"
-        case .settings: return "Settings"
+        guard let start else {
+            return BillingCycleWindow(currentStart: fallbackCurrentStart, previousStart: fallbackPreviousStart)
         }
-    }
-}
 
-enum ModelBreakdownRange: String, CaseIterable, Hashable, Identifiable {
-    case today
-    case yesterday
-    case billingCycle
-    case last30Days
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .today: return "Today"
-        case .yesterday: return "Yesterday"
-        case .billingCycle: return "Billing Cycle"
-        case .last30Days: return "Last 30 Days"
+        let cycleDuration: TimeInterval
+        if let end, end > start {
+            cycleDuration = end.timeIntervalSince(start)
+        } else {
+            cycleDuration = 31 * 24 * 60 * 60
         }
+
+        return BillingCycleWindow(
+            currentStart: start,
+            previousStart: start.addingTimeInterval(-cycleDuration)
+        )
     }
 }
 
@@ -71,11 +69,11 @@ enum ModelBreakdownAggregator {
 
     static func aggregate(
         rows: [UsageCSVRow],
-        cycleStart: Date,
+        billingCycleWindow: BillingCycleWindow,
         costMode: CostMode,
         now: Date = Date(),
         calendar: Calendar = .current
-    ) -> [ModelBreakdownRange: [ModelBreakdownRow]] {
+    ) -> [DashboardRange: [ModelBreakdownRow]] {
         let startOfToday = calendar.startOfDay(for: now)
         let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday
         let startOfLast30Days = calendar.date(byAdding: .day, value: -29, to: startOfToday) ?? startOfToday
@@ -88,7 +86,7 @@ enum ModelBreakdownAggregator {
                 row.date >= startOfYesterday && row.date < startOfToday
             },
             .billingCycle: aggregateRows(rows, costMode: costMode) { row in
-                row.date >= cycleStart
+                row.date >= billingCycleWindow.currentStart
             },
             .last30Days: aggregateRows(rows, costMode: costMode) { row in
                 row.date >= startOfLast30Days
@@ -155,6 +153,9 @@ enum ModelBreakdownAggregator {
                 if $0.totalCostCents != $1.totalCostCents {
                     return $0.totalCostCents > $1.totalCostCents
                 }
+                if $0.totalTokens != $1.totalTokens {
+                    return $0.totalTokens > $1.totalTokens
+                }
                 return $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
             }
     }
@@ -162,7 +163,7 @@ enum ModelBreakdownAggregator {
     private static func hasVisibleUsage(_ row: UsageCSVRow, costMode: CostMode) -> Bool {
         switch costMode {
         case .actual:
-            return row.costDollars(for: .actual) > 0
+            return row.tokens.totalTokens != 0 || row.costDollars(for: .actual) > 0
         case .rawAPI:
             return row.tokens.totalTokens != 0 || row.imputedCostDollars != 0
         }
@@ -175,7 +176,7 @@ enum ModelBreakdownAggregator {
     ) -> Bool {
         switch costMode {
         case .actual:
-            return row.actualCostDollars == nil
+            return row.actualCostKind == .unavailable
         case .rawAPI:
             return family == nil
         }
@@ -184,7 +185,7 @@ enum ModelBreakdownAggregator {
     private static func variantIsUnpriced(_ row: UsageCSVRow, costMode: CostMode) -> Bool {
         switch costMode {
         case .actual:
-            return row.actualCostDollars == nil
+            return row.actualCostKind == .unavailable
         case .rawAPI:
             return Pricing.pricingEntry(for: row.model) == nil
         }

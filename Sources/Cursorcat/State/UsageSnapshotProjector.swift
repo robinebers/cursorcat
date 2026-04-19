@@ -15,11 +15,21 @@ enum UsageSnapshotProjector {
 
         let startOfToday = calendar.startOfDay(for: now)
         let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday
-        let cycleStart = api.usage?.billingCycleStart?.asUnixMillisDate ?? api.csvStart
+        let startOfLast30Days = calendar.date(byAdding: .day, value: -29, to: startOfToday) ?? startOfToday
+        let startOfPrevious30Days = calendar.date(byAdding: .day, value: -59, to: startOfToday) ?? startOfToday
+        let billingCycleWindow = BillingCycleWindow.resolve(
+            start: api.usage?.billingCycleStart?.asUnixMillisDate,
+            end: api.usage?.billingCycleEnd?.asUnixMillisDate,
+            now: now,
+            calendar: calendar
+        )
 
         var today = 0.0
         var yesterday = 0.0
-        var cycle = 0.0
+        var billingCycle = 0.0
+        var previousBillingCycle = 0.0
+        var last30Days = 0.0
+        var previous30Days = 0.0
 
         for row in api.csvRows {
             let cost = row.costDollars(for: costMode)
@@ -29,17 +39,51 @@ enum UsageSnapshotProjector {
             if row.date >= startOfYesterday, row.date < startOfToday {
                 yesterday += cost
             }
-            if row.date >= cycleStart {
-                cycle += cost
+            if row.date >= billingCycleWindow.currentStart {
+                billingCycle += cost
+            }
+            if row.date >= billingCycleWindow.previousStart, row.date < billingCycleWindow.currentStart {
+                previousBillingCycle += cost
+            }
+            if row.date >= startOfLast30Days {
+                last30Days += cost
+            }
+            if row.date >= startOfPrevious30Days, row.date < startOfLast30Days {
+                previous30Days += cost
             }
         }
 
         next.todaySpend = Pricing.toCents(today)
         next.yesterdaySpend = Pricing.toCents(yesterday)
-        next.billingCycleSpend = Pricing.toCents(cycle)
+        next.billingCycleSpend = Pricing.toCents(billingCycle)
+        next.last30DaysSpend = Pricing.toCents(last30Days)
+        next.previousBillingCycleSpend = Pricing.toCents(previousBillingCycle)
+        next.previous30DaysSpend = Pricing.toCents(previous30Days)
+        next.rangeSummaries = [
+            .today: DashboardRangeSummary(
+                totalCents: Pricing.toCents(today),
+                comparisonCents: Pricing.toCents(yesterday),
+                comparisonLabel: DashboardRange.today.comparisonLabel
+            ),
+            .yesterday: DashboardRangeSummary(
+                totalCents: Pricing.toCents(yesterday),
+                comparisonCents: Pricing.toCents(today),
+                comparisonLabel: DashboardRange.yesterday.comparisonLabel
+            ),
+            .billingCycle: DashboardRangeSummary(
+                totalCents: Pricing.toCents(billingCycle),
+                comparisonCents: Pricing.toCents(previousBillingCycle),
+                comparisonLabel: DashboardRange.billingCycle.comparisonLabel
+            ),
+            .last30Days: DashboardRangeSummary(
+                totalCents: Pricing.toCents(last30Days),
+                comparisonCents: Pricing.toCents(previous30Days),
+                comparisonLabel: DashboardRange.last30Days.comparisonLabel
+            )
+        ]
         next.modelBreakdowns = ModelBreakdownAggregator.aggregate(
             rows: api.csvRows,
-            cycleStart: cycleStart,
+            billingCycleWindow: billingCycleWindow,
             costMode: costMode,
             now: now,
             calendar: calendar

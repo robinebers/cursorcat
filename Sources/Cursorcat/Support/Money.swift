@@ -18,44 +18,6 @@ enum Money {
         return formatter.string(from: NSNumber(value: dollars)) ?? "$\(dollars)"
     }
 
-    /// Compact dollar formatter that swaps in `k` / `M` / `B` for large
-    /// amounts to keep rows narrow. Small amounts (< $1,000) fall back
-    /// to the full two-decimal currency format so cents-level spend
-    /// stays legible. Negative numbers preserve the sign.
-    static func formatCompact(cents: Int) -> String {
-        let dollars = Double(cents) / 100.0
-        let absDollars = abs(dollars)
-        let sign = dollars < 0 ? "-" : ""
-
-        if absDollars < 1_000 {
-            return format(cents: cents)
-        }
-
-        let (value, suffix): (Double, String)
-        switch absDollars {
-        case 1_000_000_000...:
-            (value, suffix) = (absDollars / 1_000_000_000, "B")
-        case 1_000_000...:
-            (value, suffix) = (absDollars / 1_000_000, "M")
-        default:
-            (value, suffix) = (absDollars / 1_000, "k")
-        }
-
-        // One decimal when the number is under 100 of its unit (e.g.
-        // $19.3k, $1.2M); zero decimals above that ($193k, $12M) so the
-        // string stays tight. Trailing `.0` is stripped so whole-unit
-        // values render as `$19k` rather than `$19.0k`.
-        let formatted: String
-        if value < 100 {
-            let oneDecimal = String(format: "%.1f", value)
-            formatted = oneDecimal.hasSuffix(".0")
-                ? String(oneDecimal.dropLast(2))
-                : oneDecimal
-        } else {
-            formatted = String(format: "%.0f", value)
-        }
-        return "\(sign)$\(formatted)\(suffix)"
-    }
 }
 
 /// Human-readable countdown formatter. Renders a `Date` relative to
@@ -76,5 +38,33 @@ enum Countdown {
         if hours > 0 || days > 0 { parts.append("\(hours)h") }
         parts.append("\(minutes)m")
         return parts.joined(separator: " ")
+    }
+}
+
+enum TokenCountFormatter {
+    static func format(_ tokens: Int) -> String {
+        let value = Double(tokens)
+        let absValue = abs(value)
+        let sign = value < 0 ? "-" : ""
+
+        let scaled: Double
+        let suffix: String
+        switch absValue {
+        case 1_000_000_000...:
+            scaled = absValue / 1_000_000_000
+            suffix = "B"
+        case 1_000_000...:
+            scaled = absValue / 1_000_000
+            suffix = "M"
+        case 1_000...:
+            scaled = absValue / 1_000
+            suffix = "K"
+        default:
+            return "\(tokens) tokens"
+        }
+
+        let formatted = String(format: scaled >= 100 ? "%.0f" : "%.1f", scaled)
+        let cleaned = formatted.hasSuffix(".0") ? String(formatted.dropLast(2)) : formatted
+        return "\(sign)\(cleaned)\(suffix) tokens"
     }
 }

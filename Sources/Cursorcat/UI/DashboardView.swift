@@ -11,6 +11,7 @@ struct DashboardView: View {
 
     @ObservedObject var store: UsageStore
     @ObservedObject var settings: UserSettings
+    @ObservedObject var scheduler: PollScheduler
     let actions: DashboardActions
 
     var body: some View {
@@ -23,7 +24,12 @@ struct DashboardView: View {
             case .failed:
                 LoadingCard()
             case .loaded:
-                DashboardContent(snapshot: store.snapshot, settings: settings, actions: actions)
+                DashboardContent(
+                    snapshot: store.snapshot,
+                    settings: settings,
+                    scheduler: scheduler,
+                    actions: actions
+                )
             }
         }
         .padding(.horizontal, 16)

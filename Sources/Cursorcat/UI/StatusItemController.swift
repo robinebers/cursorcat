@@ -7,13 +7,14 @@ import SwiftUI
 /// tray title) and drives `CatAnimator` (for state locks like
 /// logged-out / error).
 @MainActor
-final class StatusItemController: NSObject {
+final class StatusItemController: NSObject, NSPopoverDelegate {
     private let statusItem: NSStatusItem
     private let store: UsageStore
     private let settings: UserSettings
     private let animator: CatAnimator
     private let scheduler: PollScheduler
     private let popover: NSPopover
+    private var eventMonitor: EventMonitor?
     private var cancellables: Set<AnyCancellable> = []
     private lazy var menuBuilder = ActionsMenuBuilder(
         target: self,
@@ -47,10 +48,16 @@ final class StatusItemController: NSObject {
     }
 
     private func configurePopover() {
-        popover.behavior = .transient
+        popover.behavior = .applicationDefined
         popover.animates = true
+        popover.delegate = self
         popover.contentViewController = NSHostingController(
-            rootView: DashboardView(store: store, settings: settings, actions: makeDashboardActions())
+            rootView: DashboardView(
+                store: store,
+                settings: settings,
+                scheduler: scheduler,
+                actions: makeDashboardActions()
+            )
         )
     }
 
@@ -60,7 +67,7 @@ final class StatusItemController: NSObject {
         guard let button = statusItem.button else { return }
         button.action = #selector(handleStatusButton(_:))
         button.target = self
-        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        button.sendAction(on: [.leftMouseDown, .rightMouseUp])
     }
 
     private func observeStore() {
@@ -76,7 +83,7 @@ final class StatusItemController: NSObject {
     private func makeDashboardActions() -> DashboardActions {
         DashboardActions(
             refresh: { [weak self] in
-                self?.scheduler.triggerNow()
+                self?.scheduler.triggerNow(manual: true)
             },
             openCursor: { [weak self] in
                 self?.openCursorAndDismiss()
@@ -137,6 +144,7 @@ final class StatusItemController: NSObject {
                      preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
         popover.contentViewController?.view.window?.makeKey()
+        startEventMonitor()
     }
 
     func togglePopoverFromHotKey() {
@@ -157,7 +165,7 @@ final class StatusItemController: NSObject {
     // MARK: - Actions
 
     @objc private func refreshNow() {
-        scheduler.triggerNow()
+        scheduler.triggerNow(manual: true)
     }
 
     @objc private func openCursor() {
@@ -199,5 +207,40 @@ final class StatusItemController: NSObject {
     @objc private func performInteraction(_ sender: NSMenuItem) {
         guard let action = InteractionMenuAction(rawValue: sender.tag) else { return }
         animator.play(action.animation)
+    }
+
+    func popoverWillClose(_ notification: Notification) {
+        eventMonitor?.stop()
+        eventMonitor = nil
+    }
+
+    private func startEventMonitor() {
+        let monitor = EventMonitor(mask: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+            guard let self else { return event }
+            if self.shouldKeepPopoverOpen(for: event) {
+                return event
+            }
+            self.popover.performClose(nil)
+            return event
+        }
+        monitor.start()
+        eventMonitor = monitor
+    }
+
+    private func shouldKeepPopoverOpen(for event: NSEvent) -> Bool {
+        guard let eventWindow = event.window else {
+            return false
+        }
+        if eventWindow == popover.contentViewController?.view.window {
+            return true
+        }
+        if eventWindow == statusItem.button?.window {
+            return true
+        }
+        let windowTypeName = String(describing: type(of: eventWindow))
+        if windowTypeName.localizedCaseInsensitiveContains("Menu") {
+            return true
+        }
+        return false
     }
 }

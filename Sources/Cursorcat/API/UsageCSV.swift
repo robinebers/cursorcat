@@ -14,33 +14,56 @@ struct UsageCSVRow {
 }
 
 extension UsageCSVRow {
+    enum ActualCostKind: Equatable {
+        case charged(Double)
+        case included
+        case unavailable
+    }
+
     private static let costPattern = try! NSRegularExpression(
         pattern: "-?[0-9]+(?:,[0-9]{3})*(?:\\.[0-9]+)?"
     )
 
-    var actualCostDollars: Double? {
+    var actualCostKind: ActualCostKind {
         let trimmed = csvCost.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
+        guard !trimmed.isEmpty else { return .unavailable }
 
         let lowercased = trimmed.lowercased()
         if lowercased.contains("included") || lowercased.contains("free") {
-            return nil
+            return .included
         }
 
         let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
         guard let match = Self.costPattern.firstMatch(in: trimmed, range: range),
               let matchRange = Range(match.range, in: trimmed) else {
-            return nil
+            return .unavailable
         }
 
         let numeric = trimmed[matchRange].replacingOccurrences(of: ",", with: "")
-        return Double(numeric)
+        guard let amount = Double(numeric) else {
+            return .unavailable
+        }
+        return .charged(amount)
+    }
+
+    var actualCostDollars: Double? {
+        switch actualCostKind {
+        case .charged(let amount):
+            return amount
+        case .included, .unavailable:
+            return nil
+        }
     }
 
     func costDollars(for mode: CostMode) -> Double {
         switch mode {
         case .actual:
-            return actualCostDollars ?? 0
+            switch actualCostKind {
+            case .charged(let amount):
+                return amount
+            case .included, .unavailable:
+                return 0
+            }
         case .rawAPI:
             return imputedCostDollars
         }

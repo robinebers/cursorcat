@@ -3,7 +3,7 @@ import AppKit
 
 /// Drives one concurrent refresh at a time. Coalesces overlapping requests.
 @MainActor
-final class PollScheduler {
+final class PollScheduler: ObservableObject {
     private let normalInterval: TimeInterval = 300  // 5 min
     private let backoffInterval: TimeInterval = 900 // 15 min
     private let wakeDebounce: TimeInterval = 3
@@ -12,9 +12,12 @@ final class PollScheduler {
     private let store: UsageStore
 
     private var timer: DispatchSourceTimer?
-    private var isRefreshing = false
     private var consecutiveFailures = 0
     private var wakeWorkItem: DispatchWorkItem?
+
+    @Published private(set) var nextRefreshAt: Date?
+    @Published private(set) var manualRefreshLockedUntil: Date?
+    @Published private(set) var isRefreshing = false
 
     init(api: CursorAPI, store: UsageStore) {
         self.api = api
@@ -35,19 +38,39 @@ final class PollScheduler {
         triggerNow() // first launch
     }
 
-    func triggerNow() {
+    func triggerNow(manual: Bool = false) {
+        let now = Date()
+        if manual {
+            guard canTriggerManualRefresh(at: now) else {
+                return
+            }
+            manualRefreshLockedUntil = now.addingTimeInterval(normalInterval)
+            scheduleTimer(deadline: manualRefreshLockedUntil ?? now)
+        }
         Task { await self.runOnce() }
     }
 
+    func canTriggerManualRefresh(at date: Date = Date()) -> Bool {
+        guard !isRefreshing else { return false }
+        guard let manualRefreshLockedUntil else { return true }
+        return date >= manualRefreshLockedUntil
+    }
+
     private func scheduleTimer(interval: TimeInterval) {
+        scheduleTimer(deadline: Date().addingTimeInterval(interval), repeating: interval)
+    }
+
+    private func scheduleTimer(deadline: Date, repeating interval: TimeInterval = 300) {
         timer?.cancel()
         let t = DispatchSource.makeTimerSource(queue: .main)
-        t.schedule(deadline: .now() + interval, repeating: interval, leeway: .seconds(10))
+        let delay = max(0, deadline.timeIntervalSinceNow)
+        t.schedule(deadline: .now() + delay, repeating: interval, leeway: .seconds(10))
         t.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.triggerNow() }
         }
         t.resume()
         timer = t
+        nextRefreshAt = deadline
     }
 
     private func handleWake() {

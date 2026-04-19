@@ -5,10 +5,13 @@ import Combine
 struct UsageSnapshot: Equatable {
     var todaySpend: Int?
     var yesterdaySpend: Int?
-
     var billingCycleSpend: Int?
+    var last30DaysSpend: Int?
+    var previousBillingCycleSpend: Int?
+    var previous30DaysSpend: Int?
     var billingCycleResetsAt: Date?
-    var modelBreakdowns: [ModelBreakdownRange: [ModelBreakdownRow]] = [:]
+    var rangeSummaries: [DashboardRange: DashboardRangeSummary] = [:]
+    var modelBreakdowns: [DashboardRange: [ModelBreakdownRow]] = [:]
 
     var plan: String?
 
@@ -74,7 +77,7 @@ final class UsageStore: ObservableObject {
     }
 
     private func hasRenderableContent(_ snapshot: UsageSnapshot) -> Bool {
-        snapshot.lastUpdated != nil || snapshot.todaySpend != nil
+        snapshot.lastUpdated != nil || !snapshot.rangeSummaries.isEmpty
     }
 
     private func reprojectLatestSnapshot() {

@@ -1,12 +1,10 @@
 import SwiftUI
 
 struct DashboardModelsView: View {
-    @Binding var selectedRange: ModelBreakdownRange
     let rows: [ModelBreakdownRow]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            rangePicker
             columnHeader
 
             if rows.isEmpty {
@@ -21,38 +19,8 @@ struct DashboardModelsView: View {
         }
     }
 
-    private var rangePicker: some View {
-        Menu {
-            ForEach(ModelBreakdownRange.allCases) { range in
-                Button {
-                    selectedRange = range
-                } label: {
-                    Text(range.title)
-                }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Text(selectedRange.title)
-                    .foregroundStyle(.primary)
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(.quaternary)
-            )
-        }
-        .menuStyle(.borderlessButton)
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-    }
-
     private var columnHeader: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Text("Model")
                 .font(.caption2)
                 .fontWeight(.medium)
@@ -62,13 +30,21 @@ struct DashboardModelsView: View {
 
             Spacer(minLength: 8)
 
-            Text("Cost")
-                .font(.caption2)
-                .fontWeight(.medium)
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(.secondary)
-                .frame(width: 58, alignment: .trailing)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("Cost")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .textCase(.uppercase)
+                    .tracking(0.6)
+                    .foregroundStyle(.secondary)
+
+                Text("Tokens")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .textCase(.uppercase)
+                    .tracking(0.6)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -85,7 +61,7 @@ private struct ModelBreakdownListRow: View {
     let row: ModelBreakdownRow
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Text(row.displayName)
                 .font(.callout)
                 .fontWeight(.semibold)
@@ -94,23 +70,37 @@ private struct ModelBreakdownListRow: View {
 
             Spacer(minLength: 8)
 
-            Text(costLabel)
-                .font(.callout)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(width: 58, alignment: .trailing)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(costLabel)
+                    .font(.callout)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+
+                Text(tokenLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
         }
         .help(tooltipText)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(row.displayName), \(costAccessibilityLabel)")
+        .accessibilityLabel("\(row.displayName), \(costAccessibilityLabel), \(tokenAccessibilityLabel)")
     }
 
     private var costLabel: String {
-        row.isUnpriced ? "—" : Money.formatCompact(cents: row.totalCostCents)
+        row.isUnpriced ? "—" : Money.format(cents: row.totalCostCents)
     }
 
     private var costAccessibilityLabel: String {
         row.isUnpriced ? "unpriced" : Money.format(cents: row.totalCostCents)
+    }
+
+    private var tokenLabel: String {
+        TokenCountFormatter.format(row.totalTokens)
+    }
+
+    private var tokenAccessibilityLabel: String {
+        "\(row.totalTokens) tokens"
     }
 
     private var tooltipText: String {

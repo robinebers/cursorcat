@@ -51,7 +51,10 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
 
         let breakdowns = ModelBreakdownAggregator.aggregate(
             rows: rows,
-            cycleStart: cycleStart,
+            billingCycleWindow: BillingCycleWindow(
+                currentStart: cycleStart,
+                previousStart: date("2026-03-11T00:00:00Z")
+            ),
             costMode: .rawAPI,
             now: now,
             calendar: calendar
@@ -108,7 +111,10 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
 
         let breakdowns = ModelBreakdownAggregator.aggregate(
             rows: rows,
-            cycleStart: cycleStart,
+            billingCycleWindow: BillingCycleWindow(
+                currentStart: cycleStart,
+                previousStart: date("2026-03-11T00:00:00Z")
+            ),
             costMode: .actual,
             now: now,
             calendar: calendar
@@ -116,6 +122,83 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
 
         XCTAssertEqual(breakdowns[.today]?.map(\.displayName), ["Composer 2"])
         XCTAssertEqual(breakdowns[.today]?.first?.totalCostCents, 44)
+    }
+
+    func testProjectorBuildsSharedRangeSummaries() {
+        let now = date("2026-04-19T12:00:00Z")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let cycleStart = date("2026-04-15T00:00:00Z")
+        let cycleEnd = date("2026-05-15T00:00:00Z")
+
+        let api = APISnapshot(
+            usage: GetCurrentPeriodUsageResponse(
+                billingCycleStart: unixMillis(cycleStart),
+                billingCycleEnd: unixMillis(cycleEnd),
+                planUsage: nil,
+                spendLimitUsage: nil,
+                enabled: true
+            ),
+            plan: nil,
+            credits: nil,
+            csvRows: [
+                makeRow(date: date("2026-04-19T09:00:00Z"), model: "composer-2-fast", tokenTotal: 100, costDollars: 1.00),
+                makeRow(date: date("2026-04-18T09:00:00Z"), model: "composer-2-fast", tokenTotal: 100, costDollars: 2.00),
+                makeRow(date: date("2026-04-16T09:00:00Z"), model: "composer-2-fast", tokenTotal: 100, costDollars: 3.00),
+                makeRow(date: date("2026-04-10T09:00:00Z"), model: "composer-2-fast", tokenTotal: 100, costDollars: 4.00),
+                makeRow(date: date("2026-04-05T09:00:00Z"), model: "composer-2-fast", tokenTotal: 100, costDollars: 6.00),
+                makeRow(date: date("2026-03-10T09:00:00Z"), model: "composer-2-fast", tokenTotal: 100, costDollars: 5.00)
+            ],
+            stripeBalanceCents: 0,
+            csvStart: date("2026-03-10T00:00:00Z"),
+            csvEnd: now
+        )
+
+        let snapshot = UsageSnapshotProjector.project(
+            api: api,
+            previous: .loading,
+            costMode: .rawAPI,
+            now: now,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(snapshot.rangeSummaries[.today], DashboardRangeSummary(totalCents: 100, comparisonCents: 200, comparisonLabel: "vs. yesterday"))
+        XCTAssertEqual(snapshot.rangeSummaries[.yesterday], DashboardRangeSummary(totalCents: 200, comparisonCents: 100, comparisonLabel: "vs. today"))
+        XCTAssertEqual(snapshot.rangeSummaries[.billingCycle], DashboardRangeSummary(totalCents: 600, comparisonCents: 1000, comparisonLabel: "vs. prev billing cycle"))
+        XCTAssertEqual(snapshot.rangeSummaries[.last30Days], DashboardRangeSummary(totalCents: 1600, comparisonCents: 500, comparisonLabel: "vs. prev. 30 days"))
+    }
+
+    func testCSVWindowStartsAtPreviousBillingCycleStart() {
+        let now = date("2026-04-19T12:00:00Z")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let cycleStart = date("2026-04-15T00:00:00Z")
+        let cycleEnd = date("2026-05-16T00:00:00Z")
+        let usage = GetCurrentPeriodUsageResponse(
+            billingCycleStart: unixMillis(cycleStart),
+            billingCycleEnd: unixMillis(cycleEnd),
+            planUsage: nil,
+            spendLimitUsage: nil,
+            enabled: true
+        )
+
+        let (start, end) = CursorAPI.csvWindow(usage: usage, now: now, calendar: calendar)
+
+        XCTAssertEqual(start, date("2026-03-15T00:00:00Z"))
+        XCTAssertEqual(end, date("2026-04-19T23:59:59Z"))
+    }
+
+    func testCSVWindowFallsBackTo63DaysWithoutCycleData() {
+        let now = date("2026-04-19T12:00:00Z")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let (start, end) = CursorAPI.csvWindow(usage: nil, now: now, calendar: calendar)
+
+        XCTAssertEqual(start, date("2026-02-15T00:00:00Z"))
+        XCTAssertEqual(end, date("2026-04-19T23:59:59Z"))
     }
 
     private func makeRow(
@@ -143,5 +226,9 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
 
     private func date(_ iso: String) -> Date {
         ISO8601DateFormatter().date(from: iso)!
+    }
+
+    private func unixMillis(_ date: Date) -> String {
+        String(Int(date.timeIntervalSince1970 * 1000))
     }
 }

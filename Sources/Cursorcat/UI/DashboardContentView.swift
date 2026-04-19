@@ -3,16 +3,17 @@ import SwiftUI
 struct DashboardContent: View {
     let snapshot: UsageSnapshot
     @ObservedObject var settings: UserSettings
+    @ObservedObject var scheduler: PollScheduler
     let actions: DashboardActions
 
     @State private var selectedTab: DashboardTab = .overview
-    @State private var selectedRange: ModelBreakdownRange = .today
+    @State private var selectedRange: DashboardRange = .today
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             DashboardHeaderView(
-                today: snapshot.todaySpend,
-                yesterday: snapshot.yesterdaySpend
+                selectedRange: $selectedRange,
+                summary: snapshot.rangeSummaries[selectedRange]
             )
 
             DashboardTabSwitcher(selectedTab: $selectedTab)
@@ -21,30 +22,14 @@ struct DashboardContent: View {
             case .overview:
                 OverviewTabContent(snapshot: snapshot)
             case .models:
-                DashboardModelsView(
-                    selectedRange: $selectedRange,
-                    rows: snapshot.modelBreakdowns[selectedRange] ?? []
-                )
+                DashboardModelsView(rows: snapshot.modelBreakdowns[selectedRange] ?? [])
             case .settings:
                 DashboardSettingsView(settings: settings)
             }
 
             Divider()
-            DashboardFooter(plan: snapshot.plan, refresh: actions.refresh)
+            DashboardFooter(plan: snapshot.plan, scheduler: scheduler, refresh: actions.refresh)
         }
-    }
-
-    private var hasSpendSection: Bool {
-        snapshot.yesterdaySpend != nil
-            || snapshot.billingCycleSpend != nil
-            || snapshot.billingCycleResetsAt != nil
-    }
-
-    private var hasQuotasSection: Bool {
-        snapshot.autoPercentLeft != nil
-            || snapshot.apiPercentLeft != nil
-            || (snapshot.onDemandLimit ?? 0) > 0
-            || (snapshot.creditsLeft ?? 0) > 0
     }
 }
 
@@ -57,24 +42,13 @@ private struct OverviewTabContent: View {
                 ErrorBanner(message: error)
             }
 
-            if hasSpendSection {
-                SpendSection(snapshot: snapshot)
-            }
-
-            if hasSpendSection && hasQuotasSection {
-                Divider()
-            }
-
             if hasQuotasSection {
                 QuotasSection(snapshot: snapshot)
             }
+            if let resetsAt = snapshot.billingCycleResetsAt {
+                SubscriptionResetText(resetsAt: resetsAt)
+            }
         }
-    }
-
-    private var hasSpendSection: Bool {
-        snapshot.yesterdaySpend != nil
-            || snapshot.billingCycleSpend != nil
-            || snapshot.billingCycleResetsAt != nil
     }
 
     private var hasQuotasSection: Bool {
@@ -82,27 +56,6 @@ private struct OverviewTabContent: View {
             || snapshot.apiPercentLeft != nil
             || (snapshot.onDemandLimit ?? 0) > 0
             || (snapshot.creditsLeft ?? 0) > 0
-    }
-}
-
-private struct SpendSection: View {
-    let snapshot: UsageSnapshot
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let cents = snapshot.yesterdaySpend {
-                StatRow(label: "Yesterday",
-                        value: Money.formatCompact(cents: cents))
-            }
-            if let cents = snapshot.billingCycleSpend {
-                StatRow(label: "Billing cycle",
-                        value: Money.formatCompact(cents: cents))
-            }
-            if let resetsAt = snapshot.billingCycleResetsAt {
-                StatRow(label: "Resets in",
-                        value: Countdown.format(resetsAt: resetsAt))
-            }
-        }
     }
 }
 
@@ -128,7 +81,7 @@ private struct QuotasSection: View {
                 QuotaRow(
                     label: "On-demand",
                     fraction: fraction,
-                    value: "\(Money.formatCompact(cents: remaining)) / \(Money.formatCompact(cents: limit)) left"
+                    value: "\(Money.format(cents: remaining)) / \(Money.format(cents: limit)) left"
                 )
             }
             if let credits = snapshot.creditsLeft,
@@ -138,42 +91,87 @@ private struct QuotasSection: View {
                 QuotaRow(
                     label: "Credits",
                     fraction: Double(credits) / Double(total),
-                    value: "\(Money.formatCompact(cents: credits)) / \(Money.formatCompact(cents: total)) left"
+                    value: "\(Money.format(cents: credits)) / \(Money.format(cents: total)) left"
                 )
             } else if let credits = snapshot.creditsLeft,
                       credits > 0 {
                 StatRow(label: "Credits",
-                        value: "\(Money.formatCompact(cents: credits)) left")
+                        value: "\(Money.format(cents: credits)) left")
             }
+        }
+    }
+}
+
+private struct SubscriptionResetText: View {
+    let resetsAt: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            Text("Your subscription resets in \(Countdown.format(resetsAt: resetsAt, now: context.date))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 }
 
 private struct DashboardFooter: View {
     let plan: String?
+    @ObservedObject var scheduler: PollScheduler
     let refresh: () -> Void
 
     @State private var refreshSpins: Int = 0
 
     var body: some View {
-        HStack(alignment: .center) {
-            if let plan {
-                PlanPill(plan: plan)
-            }
-            Spacer(minLength: 8)
-            Button {
-                refreshSpins += 1
-                refresh()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.body)
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            HStack(alignment: .center) {
+                if let plan {
+                    PlanPill(plan: plan)
+                }
+                Spacer(minLength: 8)
+                Text(refreshStatus(now: context.date))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .symbolEffect(.rotate, value: refreshSpins)
+                    .monospacedDigit()
+                Button {
+                    refreshSpins += 1
+                    refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .symbolEffect(.rotate, value: refreshSpins)
+                }
+                .buttonStyle(.plain)
+                .help("Refresh now")
+                .accessibilityLabel("Refresh")
+                .disabled(isRefreshDisabled(now: context.date))
             }
-            .buttonStyle(.plain)
-            .help("Refresh now")
-            .accessibilityLabel("Refresh")
         }
+    }
+
+    private func isRefreshDisabled(now: Date) -> Bool {
+        scheduler.isRefreshing
+            || (scheduler.manualRefreshLockedUntil.map { now < $0 } ?? false)
+    }
+
+    private func refreshStatus(now: Date) -> String {
+        if scheduler.isRefreshing {
+            return "Updates now..."
+        }
+        guard let nextRefreshAt = scheduler.nextRefreshAt else {
+            return "Updates now..."
+        }
+
+        let remaining = Int(nextRefreshAt.timeIntervalSince(now))
+        if remaining <= 0 {
+            return "Updates now..."
+        }
+        if remaining < 60 {
+            return "Updates in \(remaining)s"
+        }
+        let minutes = remaining / 60
+        return "Updates in \(minutes)m"
     }
 }
 
