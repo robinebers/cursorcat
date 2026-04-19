@@ -100,6 +100,7 @@ private struct ModelBreakdownListRow: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 58, alignment: .trailing)
         }
+        .help(tooltipText)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(row.displayName), \(costAccessibilityLabel)")
     }
@@ -110,5 +111,17 @@ private struct ModelBreakdownListRow: View {
 
     private var costAccessibilityLabel: String {
         row.isUnpriced ? "unpriced" : Money.format(cents: row.totalCostCents)
+    }
+
+    private var tooltipText: String {
+        row.variants
+            .map { variant in
+                "\(variant.model) - \(variantCostLabel(for: variant))"
+            }
+            .joined(separator: "\n")
+    }
+
+    private func variantCostLabel(for variant: ModelBreakdownRow.Variant) -> String {
+        variant.isUnpriced ? "—" : Money.format(cents: variant.totalCostCents)
     }
 }

@@ -7,12 +7,12 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
 
         XCTAssertEqual(manifest.retrievedAt, "2026-03-17")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyID, "claude-4.7-opus")
-        XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyDisplayName, "Claude Opus 4.7")
+        XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyDisplayName, "Claude 4.7 Opus")
     }
 
     func testPricingResolvesModelFamily() {
-        XCTAssertEqual(Pricing.family(for: "claude-opus-4-7-high")?.displayName, "Claude Opus 4.7")
-        XCTAssertEqual(Pricing.family(for: "claude-opus-4-7-thinking-high")?.displayName, "Claude Opus 4.7")
+        XCTAssertEqual(Pricing.family(for: "claude-opus-4-7-high")?.displayName, "Claude 4.7 Opus")
+        XCTAssertEqual(Pricing.family(for: "claude-opus-4-7-thinking-high")?.displayName, "Claude 4.7 Opus")
         XCTAssertEqual(Pricing.family(for: "composer-2-fast")?.displayName, "Composer 2")
     }
 
@@ -58,17 +58,28 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
 
         let todayRows = breakdowns[.today] ?? []
         XCTAssertEqual(todayRows.count, 1)
-        XCTAssertEqual(todayRows.first?.displayName, "Claude Opus 4.7")
+        XCTAssertEqual(todayRows.first?.displayName, "Claude 4.7 Opus")
         XCTAssertEqual(todayRows.first?.totalTokens, 3_000)
         XCTAssertEqual(todayRows.first?.totalCostCents, 375)
+        XCTAssertEqual(
+            todayRows.first?.variants,
+            [
+                .init(model: "claude-opus-4-7-thinking-high", totalCostCents: 250, isUnpriced: false),
+                .init(model: "claude-opus-4-7-high", totalCostCents: 125, isUnpriced: false)
+            ]
+        )
 
         let yesterdayRows = breakdowns[.yesterday] ?? []
         XCTAssertEqual(yesterdayRows.map(\.displayName), ["Composer 2"])
 
         let cycleRows = breakdowns[.billingCycle] ?? []
-        XCTAssertEqual(cycleRows.map(\.displayName), ["Claude Opus 4.7", "Composer 2", "mystery-model"])
+        XCTAssertEqual(cycleRows.map(\.displayName), ["Claude 4.7 Opus", "Composer 2", "mystery-model"])
         XCTAssertEqual(cycleRows.last?.isUnpriced, true)
         XCTAssertEqual(cycleRows.last?.totalCostCents, 0)
+        XCTAssertEqual(
+            cycleRows.last?.variants,
+            [.init(model: "mystery-model", totalCostCents: 0, isUnpriced: true)]
+        )
     }
 
     private func makeRow(date: Date, model: String, tokenTotal: Int, costDollars: Double) -> UsageCSVRow {
