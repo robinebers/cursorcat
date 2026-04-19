@@ -282,9 +282,10 @@ build_dmg() {
     "$DMG_PATH"
 
   local icon_resource_script
-  icon_resource_script="$(mktemp "$DIST_DIR/dmg-icon.XXXXXX.r")"
+  rm -f "$DIST_DIR/dmg-icon.XXXXXX.r" "$DIST_DIR/dmg-icon-source.XXXXXX.icns"
+  icon_resource_script="$(mktemp "$DIST_DIR/dmg-icon.XXXXXX")"
   local icon_resource_source
-  icon_resource_source="$(mktemp "$DIST_DIR/dmg-icon-source.XXXXXX.icns")"
+  icon_resource_source="$(mktemp "$DIST_DIR/dmg-icon-source.XXXXXX")"
   cp "$ICON_ICNS" "$icon_resource_source"
   /usr/bin/sips -i "$icon_resource_source" >/dev/null
   "$DEREZ_BIN" -only icns "$icon_resource_source" >"$icon_resource_script"
