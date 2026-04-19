@@ -4,46 +4,13 @@ struct DashboardModelsView: View {
     let rows: [ModelBreakdownRow]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            columnHeader
-
-            if rows.isEmpty {
-                emptyState
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(rows) { row in
-                        ModelBreakdownListRow(row: row)
-                    }
+        if rows.isEmpty {
+            emptyState
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(rows) { row in
+                    ModelBreakdownListRow(row: row)
                 }
-            }
-        }
-    }
-
-    private var columnHeader: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text("Model")
-                .font(.caption2)
-                .fontWeight(.medium)
-                .textCase(.uppercase)
-                .tracking(0.6)
-                .foregroundStyle(.secondary)
-
-            Spacer(minLength: 8)
-
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("Cost")
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .textCase(.uppercase)
-                    .tracking(0.6)
-                    .foregroundStyle(.secondary)
-
-                Text("Tokens")
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .textCase(.uppercase)
-                    .tracking(0.6)
-                    .foregroundStyle(.secondary)
             }
         }
     }

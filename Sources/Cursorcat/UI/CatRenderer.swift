@@ -11,7 +11,8 @@ enum CatState: Equatable {
     case error
 }
 
-/// Extracts individual 32x32 frames from `oneko.gif` (adryd325/oneko.js, MIT)
+/// Extracts individual 32x32 frames from `oneko.gif`
+/// (https://github.com/adryd325/oneko.js, MIT)
 /// and returns them as **template** `NSImage`s that adapt to the menu bar
 /// appearance. Template images must be black-and-clear only, but AppKit
 /// preserves alpha on template ink — so we emit dark source pixels at full
@@ -82,7 +83,7 @@ enum CatRenderer {
 
     @MainActor
     private static let sheetBitmap: NSBitmapImageRep? = {
-        let bundle = Bundle.module
+        let bundle = AppBundle.resources
         guard let url = bundle.url(forResource: "oneko", withExtension: "gif"),
               let data = try? Data(contentsOf: url),
               let rep = NSBitmapImageRep(data: data)

@@ -36,8 +36,9 @@ struct AuthState {
 }
 
 /// Orchestrator: loadAuth → refreshIfNeeded → access token.
-/// Mirrors openusage/plugins/cursor/plugin.js two-source heuristic and cstats
-/// refresh flow. Thread-safe via actor isolation.
+/// Adapted from robinebers/openusage:
+/// https://github.com/robinebers/openusage
+/// Thread-safe via actor isolation.
 actor CursorAuth {
     static let accessTokenKey = "cursorAuth/accessToken"
     static let refreshTokenKey = "cursorAuth/refreshToken"

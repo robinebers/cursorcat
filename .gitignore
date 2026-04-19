@@ -4,4 +4,4 @@
 dist/
 *.log
 .codex/cache/
-
+docs/plans/

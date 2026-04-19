@@ -57,7 +57,7 @@ protocol ModelManifestSource: Sendable {
 
 struct BundledModelManifestSource: ModelManifestSource {
     func loadManifest() throws -> ModelManifest {
-        guard let url = Bundle.module.url(forResource: "model_manifest", withExtension: "json") else {
+        guard let url = AppBundle.resources.url(forResource: "model_manifest", withExtension: "json") else {
             throw CocoaError(.fileNoSuchFile)
         }
 
