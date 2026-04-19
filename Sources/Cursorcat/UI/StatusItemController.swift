@@ -10,6 +10,7 @@ import SwiftUI
 final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
     private let store: UsageStore
+    private let settings: UserSettings
     private let animator: CatAnimator
     private let scheduler: PollScheduler
     private let popover: NSPopover
@@ -25,10 +26,12 @@ final class StatusItemController: NSObject {
     )
 
     init(store: UsageStore,
+         settings: UserSettings,
          animator: CatAnimator,
          scheduler: PollScheduler) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.store = store
+        self.settings = settings
         self.animator = animator
         self.scheduler = scheduler
         self.popover = NSPopover()
@@ -47,7 +50,7 @@ final class StatusItemController: NSObject {
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = NSHostingController(
-            rootView: DashboardView(store: store, actions: makeDashboardActions())
+            rootView: DashboardView(store: store, settings: settings, actions: makeDashboardActions())
         )
     }
 
@@ -134,6 +137,11 @@ final class StatusItemController: NSObject {
                      preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
         popover.contentViewController?.view.window?.makeKey()
+    }
+
+    func togglePopoverFromHotKey() {
+        guard let button = statusItem.button else { return }
+        togglePopover(from: button)
     }
 
     private func showActionsMenu(from button: NSStatusBarButton) {

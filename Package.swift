@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "Cursorcat",
+    name: "CursorCat",
     platforms: [
         .macOS(.v26)
     ],
     products: [
-        .executable(name: "Cursorcat", targets: ["Cursorcat"])
+        .executable(name: "CursorCat", targets: ["CursorCat"])
     ],
     targets: [
         .executableTarget(
-            name: "Cursorcat",
+            name: "CursorCat",
             path: "Sources/Cursorcat",
             resources: [
                 .process("Resources")
@@ -22,7 +22,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CursorcatTests",
-            dependencies: ["Cursorcat"],
+            dependencies: ["CursorCat"],
             path: "Tests/CursorcatTests"
         )
     ]

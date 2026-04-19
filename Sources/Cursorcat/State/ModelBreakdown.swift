@@ -3,6 +3,7 @@ import Foundation
 enum DashboardTab: String, CaseIterable, Identifiable {
     case overview
     case models
+    case settings
 
     var id: String { rawValue }
 
@@ -10,6 +11,7 @@ enum DashboardTab: String, CaseIterable, Identifiable {
         switch self {
         case .overview: return "Overview"
         case .models: return "Models"
+        case .settings: return "Settings"
         }
     }
 }
@@ -70,6 +72,7 @@ enum ModelBreakdownAggregator {
     static func aggregate(
         rows: [UsageCSVRow],
         cycleStart: Date,
+        costMode: CostMode,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [ModelBreakdownRange: [ModelBreakdownRow]] {
@@ -78,16 +81,16 @@ enum ModelBreakdownAggregator {
         let startOfLast30Days = calendar.date(byAdding: .day, value: -29, to: startOfToday) ?? startOfToday
 
         return [
-            .today: aggregateRows(rows) { row in
+            .today: aggregateRows(rows, costMode: costMode) { row in
                 row.date >= startOfToday
             },
-            .yesterday: aggregateRows(rows) { row in
+            .yesterday: aggregateRows(rows, costMode: costMode) { row in
                 row.date >= startOfYesterday && row.date < startOfToday
             },
-            .billingCycle: aggregateRows(rows) { row in
+            .billingCycle: aggregateRows(rows, costMode: costMode) { row in
                 row.date >= cycleStart
             },
-            .last30Days: aggregateRows(rows) { row in
+            .last30Days: aggregateRows(rows, costMode: costMode) { row in
                 row.date >= startOfLast30Days
             }
         ]
@@ -95,15 +98,17 @@ enum ModelBreakdownAggregator {
 
     private static func aggregateRows(
         _ rows: [UsageCSVRow],
+        costMode: CostMode,
         includeRow: (UsageCSVRow) -> Bool
     ) -> [ModelBreakdownRow] {
         var grouped: [String: Accumulator] = [:]
 
-        for row in rows where includeRow(row) && hasVisibleUsage(row) {
+        for row in rows where includeRow(row) && hasVisibleUsage(row, costMode: costMode) {
             let family = Pricing.family(for: row.model)
             let familyID = family?.id ?? row.model
             let displayName = family?.displayName ?? row.model
-            let isUnpriced = family == nil
+            let costDollars = row.costDollars(for: costMode)
+            let isUnpriced = rowIsUnpriced(row, family: family, costMode: costMode)
 
             var accumulator = grouped[familyID] ?? Accumulator(
                 familyID: familyID,
@@ -111,13 +116,13 @@ enum ModelBreakdownAggregator {
                 isUnpriced: isUnpriced
             )
             accumulator.totalTokens += row.tokens.totalTokens
-            accumulator.totalCostDollars += row.imputedCostDollars
+            accumulator.totalCostDollars += costDollars
 
             var variant = accumulator.variants[row.model] ?? VariantAccumulator(
                 model: row.model,
-                isUnpriced: Pricing.pricingEntry(for: row.model) == nil
+                isUnpriced: variantIsUnpriced(row, costMode: costMode)
             )
-            variant.totalCostDollars += row.imputedCostDollars
+            variant.totalCostDollars += costDollars
             accumulator.variants[row.model] = variant
             grouped[familyID] = accumulator
         }
@@ -154,7 +159,34 @@ enum ModelBreakdownAggregator {
             }
     }
 
-    private static func hasVisibleUsage(_ row: UsageCSVRow) -> Bool {
-        row.tokens.totalTokens != 0 || row.imputedCostDollars != 0
+    private static func hasVisibleUsage(_ row: UsageCSVRow, costMode: CostMode) -> Bool {
+        switch costMode {
+        case .actual:
+            return row.costDollars(for: .actual) > 0
+        case .rawAPI:
+            return row.tokens.totalTokens != 0 || row.imputedCostDollars != 0
+        }
+    }
+
+    private static func rowIsUnpriced(
+        _ row: UsageCSVRow,
+        family: Pricing.ModelFamily?,
+        costMode: CostMode
+    ) -> Bool {
+        switch costMode {
+        case .actual:
+            return row.actualCostDollars == nil
+        case .rawAPI:
+            return family == nil
+        }
+    }
+
+    private static func variantIsUnpriced(_ row: UsageCSVRow, costMode: CostMode) -> Bool {
+        switch costMode {
+        case .actual:
+            return row.actualCostDollars == nil
+        case .rawAPI:
+            return Pricing.pricingEntry(for: row.model) == nil
+        }
     }
 }

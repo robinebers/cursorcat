@@ -98,7 +98,7 @@ final class ActionsMenuBuilder {
 
         menu.addItem(.separator())
 
-        let quit = NSMenuItem(title: "Quit Cursorcat",
+        let quit = NSMenuItem(title: "Quit CursorCat",
                               action: quitSelector,
                               keyEquivalent: "q")
         quit.target = target

@@ -13,6 +13,40 @@ struct UsageCSVRow {
     var csvCost: String
 }
 
+extension UsageCSVRow {
+    private static let costPattern = try! NSRegularExpression(
+        pattern: "-?[0-9]+(?:,[0-9]{3})*(?:\\.[0-9]+)?"
+    )
+
+    var actualCostDollars: Double? {
+        let trimmed = csvCost.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let lowercased = trimmed.lowercased()
+        if lowercased.contains("included") || lowercased.contains("free") {
+            return nil
+        }
+
+        let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+        guard let match = Self.costPattern.firstMatch(in: trimmed, range: range),
+              let matchRange = Range(match.range, in: trimmed) else {
+            return nil
+        }
+
+        let numeric = trimmed[matchRange].replacingOccurrences(of: ",", with: "")
+        return Double(numeric)
+    }
+
+    func costDollars(for mode: CostMode) -> Double {
+        switch mode {
+        case .actual:
+            return actualCostDollars ?? 0
+        case .rawAPI:
+            return imputedCostDollars
+        }
+    }
+}
+
 extension TokenUsage {
     var totalTokens: Int {
         inputCacheWrite + inputNoCacheWrite + cacheRead + output

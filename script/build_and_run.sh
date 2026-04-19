@@ -2,7 +2,7 @@
 set -euo pipefail
 
 MODE="${1:-run}"
-APP_NAME="Cursorcat"
+APP_NAME="CursorCat"
 BUNDLE_ID="com.sunstory.cursorcat"
 MIN_SYSTEM_VERSION="26.0"
 APP_VERSION="0.1.0"

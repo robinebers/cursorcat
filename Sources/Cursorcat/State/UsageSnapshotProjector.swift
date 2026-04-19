@@ -4,6 +4,7 @@ enum UsageSnapshotProjector {
     static func project(
         api: APISnapshot,
         previous: UsageSnapshot,
+        costMode: CostMode,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> UsageSnapshot {
@@ -21,7 +22,7 @@ enum UsageSnapshotProjector {
         var cycle = 0.0
 
         for row in api.csvRows {
-            let cost = row.imputedCostDollars
+            let cost = row.costDollars(for: costMode)
             if row.date >= startOfToday {
                 today += cost
             }
@@ -39,6 +40,7 @@ enum UsageSnapshotProjector {
         next.modelBreakdowns = ModelBreakdownAggregator.aggregate(
             rows: api.csvRows,
             cycleStart: cycleStart,
+            costMode: costMode,
             now: now,
             calendar: calendar
         )

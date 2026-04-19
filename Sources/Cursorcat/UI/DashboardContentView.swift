@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DashboardContent: View {
     let snapshot: UsageSnapshot
+    @ObservedObject var settings: UserSettings
     let actions: DashboardActions
 
     @State private var selectedTab: DashboardTab = .overview
@@ -24,6 +25,8 @@ struct DashboardContent: View {
                     selectedRange: $selectedRange,
                     rows: snapshot.modelBreakdowns[selectedRange] ?? []
                 )
+            case .settings:
+                DashboardSettingsView(settings: settings)
             }
 
             Divider()

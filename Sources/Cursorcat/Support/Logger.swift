@@ -11,7 +11,7 @@ enum Log {
     static let app = Logger(subsystem: subsystem, category: "app")
 }
 
-/// Rolling log file at ~/Library/Logs/Cursorcat/cursorcat.log.
+/// Rolling log file at ~/Library/Logs/CursorCat/cursorcat.log.
 /// Keeps 3 days of logs, best effort. Never throws to caller.
 final class FileLog: @unchecked Sendable {
     static let shared = FileLog()
@@ -27,7 +27,7 @@ final class FileLog: @unchecked Sendable {
     private init() {
         let fm = FileManager.default
         guard let logsDir = fm.urls(for: .libraryDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("Logs/Cursorcat", isDirectory: true)
+            .appendingPathComponent("Logs/CursorCat", isDirectory: true)
         else {
             fileURL = nil
             return

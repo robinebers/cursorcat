@@ -1,5 +1,5 @@
 import XCTest
-@testable import Cursorcat
+@testable import CursorCat
 
 final class ManifestAndModelBreakdownTests: XCTestCase {
     func testBundledManifestLoadsFamilyMetadata() throws {
@@ -52,6 +52,7 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         let breakdowns = ModelBreakdownAggregator.aggregate(
             rows: rows,
             cycleStart: cycleStart,
+            costMode: .rawAPI,
             now: now,
             calendar: calendar
         )
@@ -82,7 +83,48 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         )
     }
 
-    private func makeRow(date: Date, model: String, tokenTotal: Int, costDollars: Double) -> UsageCSVRow {
+    func testAggregatorUsesActualCostWhenRequested() {
+        let now = date("2026-04-19T12:00:00Z")
+        let cycleStart = date("2026-04-15T00:00:00Z")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let rows = [
+            makeRow(
+                date: date("2026-04-19T10:00:00Z"),
+                model: "claude-opus-4-7-high",
+                tokenTotal: 1_000,
+                costDollars: 1.25,
+                csvCost: "Included"
+            ),
+            makeRow(
+                date: date("2026-04-19T09:00:00Z"),
+                model: "composer-2-fast",
+                tokenTotal: 2_000,
+                costDollars: 2.50,
+                csvCost: "$0.44"
+            )
+        ]
+
+        let breakdowns = ModelBreakdownAggregator.aggregate(
+            rows: rows,
+            cycleStart: cycleStart,
+            costMode: .actual,
+            now: now,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(breakdowns[.today]?.map(\.displayName), ["Composer 2"])
+        XCTAssertEqual(breakdowns[.today]?.first?.totalCostCents, 44)
+    }
+
+    private func makeRow(
+        date: Date,
+        model: String,
+        tokenTotal: Int,
+        costDollars: Double,
+        csvCost: String = ""
+    ) -> UsageCSVRow {
         UsageCSVRow(
             date: date,
             model: model,
@@ -95,7 +137,7 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
                 output: 0
             ),
             imputedCostDollars: costDollars,
-            csvCost: ""
+            csvCost: csvCost
         )
     }
 

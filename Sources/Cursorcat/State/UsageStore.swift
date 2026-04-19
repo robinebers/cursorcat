@@ -30,13 +30,31 @@ struct UsageSnapshot: Equatable {
 
 @MainActor
 final class UsageStore: ObservableObject {
+    private let settings: UserSettings
+    private var latestAPISnapshot: APISnapshot?
+    private var cancellables: Set<AnyCancellable> = []
+
     @Published private(set) var snapshot: UsageSnapshot = .loading
     @Published private(set) var viewState: UsageViewState = .loading
 
+    init(settings: UserSettings) {
+        self.settings = settings
+
+        settings.$costMode
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.reprojectLatestSnapshot()
+            }
+            .store(in: &cancellables)
+    }
+
     func applySnapshot(_ api: APISnapshot, now: Date = Date(), calendar: Calendar = .current) {
+        latestAPISnapshot = api
         snapshot = UsageSnapshotProjector.project(
             api: api,
             previous: snapshot,
+            costMode: settings.costMode,
             now: now,
             calendar: calendar
         )
@@ -57,5 +75,19 @@ final class UsageStore: ObservableObject {
 
     private func hasRenderableContent(_ snapshot: UsageSnapshot) -> Bool {
         snapshot.lastUpdated != nil || snapshot.todaySpend != nil
+    }
+
+    private func reprojectLatestSnapshot() {
+        guard let latestAPISnapshot else { return }
+
+        let preservedLastUpdated = snapshot.lastUpdated
+        var next = UsageSnapshotProjector.project(
+            api: latestAPISnapshot,
+            previous: snapshot,
+            costMode: settings.costMode
+        )
+        next.lastUpdated = preservedLastUpdated
+        snapshot = next
+        viewState = .loaded
     }
 }
