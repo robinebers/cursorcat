@@ -8,6 +8,18 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(manifest.retrievedAt, "2026-04-19")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyID, "claude-4.7-opus")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyDisplayName, "Claude 4.7 Opus")
+
+        let gpt54 = try XCTUnwrap(manifest.pricing["gpt-5.4"])
+        let gpt55 = try XCTUnwrap(manifest.pricing["gpt-5.5"])
+        let gpt55Fast = try XCTUnwrap(manifest.pricing["gpt-5.5-fast"])
+        XCTAssertEqual(gpt55.inputPerMillion, gpt54.inputPerMillion * 2)
+        XCTAssertEqual(gpt55.cacheWritePerMillion, gpt54.cacheWritePerMillion * 2)
+        XCTAssertEqual(gpt55.cacheReadPerMillion, gpt54.cacheReadPerMillion * 2)
+        XCTAssertEqual(gpt55.outputPerMillion, gpt54.outputPerMillion * 2)
+        XCTAssertEqual(gpt55Fast.inputPerMillion, gpt55.inputPerMillion * 2.5)
+        XCTAssertEqual(gpt55Fast.cacheWritePerMillion, gpt55.cacheWritePerMillion * 2.5)
+        XCTAssertEqual(gpt55Fast.cacheReadPerMillion, gpt55.cacheReadPerMillion * 2.5)
+        XCTAssertEqual(gpt55Fast.outputPerMillion, gpt55.outputPerMillion * 2.5)
     }
 
     func testPricingResolvesModelFamily() {
@@ -16,6 +28,8 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(Pricing.family(for: "composer-2-fast")?.displayName, "Composer 2")
         XCTAssertEqual(Pricing.family(for: "gpt-5.3-codex-low-fast")?.displayName, "GPT-5.3 Codex")
         XCTAssertEqual(Pricing.family(for: "gpt-5.4-mini-high")?.displayName, "GPT-5.4 Mini")
+        XCTAssertEqual(Pricing.family(for: "gpt-5.5-high")?.displayName, "GPT-5.5")
+        XCTAssertEqual(Pricing.family(for: "gpt-5.5-high-fast")?.displayName, "GPT-5.5")
         XCTAssertEqual(Pricing.family(for: "default")?.displayName, "Auto")
     }
 

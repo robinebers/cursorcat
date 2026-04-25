@@ -427,6 +427,32 @@
       "output_per_million": 30.0,
       "apply_max_mode_uplift": true
     },
+    "gpt-5.5": {
+      "display_name": "GPT-5.5",
+      "provider": "openai",
+      "family_id": "gpt-5.5",
+      "family_display_name": "GPT-5.5",
+      "input_per_million": 5.0,
+      "cache_write_per_million": 5.0,
+      "cache_read_per_million": 0.5,
+      "output_per_million": 30.0,
+      "apply_max_mode_uplift": true,
+      "long_context_input_threshold": 272000,
+      "long_context_input_multiplier": 2.0,
+      "long_context_output_multiplier": 1.5,
+      "long_context_cached_input_multiplier": 2.0
+    },
+    "gpt-5.5-fast": {
+      "display_name": "GPT-5.5 Fast",
+      "provider": "openai",
+      "family_id": "gpt-5.5",
+      "family_display_name": "GPT-5.5",
+      "input_per_million": 12.5,
+      "cache_write_per_million": 12.5,
+      "cache_read_per_million": 1.25,
+      "output_per_million": 75.0,
+      "apply_max_mode_uplift": true
+    },
     "gpt-5.4-mini": {
       "display_name": "GPT-5.4 Mini",
       "provider": "openai",
@@ -506,6 +532,8 @@
     { "pattern": "^gpt-5\\.4-nano(?:-(?:none|low|medium|high|xhigh))?$", "canonical": "gpt-5.4-nano" },
     { "pattern": "^gpt-5\\.4-(?:low|medium|high|xhigh)-fast$", "canonical": "gpt-5.4-fast" },
     { "pattern": "^gpt-5\\.4-(?:low|medium|high|xhigh)$", "canonical": "gpt-5.4" },
+    { "pattern": "^gpt-5\\.5(?:-(?:low|medium|high|xhigh))?-fast$", "canonical": "gpt-5.5-fast" },
+    { "pattern": "^gpt-5\\.5(?:-(?:low|medium|high|xhigh))?$", "canonical": "gpt-5.5" },
     { "pattern": "^kimi-k2\\.5$", "canonical": "kimi-k2.5" },
     { "pattern": "^kimi-k2p5$", "canonical": "kimi-k2.5" },
     { "pattern": "^[Pp]remium \\((?:[Gg][Pp][Tt]-5\\.3-[Cc]odex|[Cc]odex 5\\.3)\\)$", "canonical": "gpt-5.3-codex" }
