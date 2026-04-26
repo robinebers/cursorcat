@@ -9,17 +9,19 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyID, "claude-4.7-opus")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyDisplayName, "Claude 4.7 Opus")
 
-        let gpt54 = try XCTUnwrap(manifest.pricing["gpt-5.4"])
         let gpt55 = try XCTUnwrap(manifest.pricing["gpt-5.5"])
         let gpt55Fast = try XCTUnwrap(manifest.pricing["gpt-5.5-fast"])
-        XCTAssertEqual(gpt55.inputPerMillion, gpt54.inputPerMillion * 2)
-        XCTAssertEqual(gpt55.cacheWritePerMillion, gpt54.cacheWritePerMillion * 2)
-        XCTAssertEqual(gpt55.cacheReadPerMillion, gpt54.cacheReadPerMillion * 2)
-        XCTAssertEqual(gpt55.outputPerMillion, gpt54.outputPerMillion * 2)
-        XCTAssertEqual(gpt55Fast.inputPerMillion, gpt55.inputPerMillion * 2.5)
-        XCTAssertEqual(gpt55Fast.cacheWritePerMillion, gpt55.cacheWritePerMillion * 2.5)
-        XCTAssertEqual(gpt55Fast.cacheReadPerMillion, gpt55.cacheReadPerMillion * 2.5)
-        XCTAssertEqual(gpt55Fast.outputPerMillion, gpt55.outputPerMillion * 2.5)
+        XCTAssertEqual(gpt55.inputPerMillion, 5.0)
+        XCTAssertEqual(gpt55.cacheWritePerMillion, 5.0)
+        XCTAssertEqual(gpt55.cacheReadPerMillion, 0.5)
+        XCTAssertEqual(gpt55.outputPerMillion, 30.0)
+        XCTAssertEqual(gpt55Fast.inputPerMillion, 12.5)
+        XCTAssertEqual(gpt55Fast.cacheWritePerMillion, 12.5)
+        XCTAssertEqual(gpt55Fast.cacheReadPerMillion, 1.25)
+        XCTAssertEqual(gpt55Fast.outputPerMillion, 75.0)
+        XCTAssertEqual(gpt55.longContextInputThreshold, 272_000)
+        XCTAssertEqual(gpt55.longContextInputMultiplier, 2.0)
+        XCTAssertEqual(gpt55.longContextOutputMultiplier, 1.5)
     }
 
     func testPricingResolvesModelFamily() {
@@ -31,6 +33,51 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-high")?.displayName, "GPT-5.5")
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-high-fast")?.displayName, "GPT-5.5")
         XCTAssertEqual(Pricing.family(for: "default")?.displayName, "Auto")
+    }
+
+    func testGPT55CostEstimationUsesStandardAndFastTiersSeparately() {
+        let underLongContextThreshold = TokenUsage(
+            inputCacheWrite: 0,
+            inputNoCacheWrite: 100_000,
+            cacheRead: 100_000,
+            output: 100_000
+        )
+
+        XCTAssertEqual(
+            Pricing.estimatedCostDollars(model: "gpt-5.5-high", maxMode: false, tokens: underLongContextThreshold),
+            3.55,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            Pricing.estimatedCostDollars(model: "gpt-5.5-high-fast", maxMode: false, tokens: underLongContextThreshold),
+            8.875,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            Pricing.estimatedCostDollars(model: "gpt-5.5-high", maxMode: true, tokens: underLongContextThreshold),
+            3.55,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testGPT55AggregateRowsDoNotInferLongContextPricing() {
+        let aggregateTokensAboveThreshold = TokenUsage(
+            inputCacheWrite: 0,
+            inputNoCacheWrite: 1_000_000,
+            cacheRead: 1_000_000,
+            output: 1_000_000
+        )
+
+        XCTAssertEqual(
+            Pricing.estimatedCostDollars(model: "gpt-5.5-high", maxMode: false, tokens: aggregateTokensAboveThreshold),
+            35.5,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            Pricing.estimatedCostDollars(model: "gpt-5.5-high", maxMode: true, tokens: aggregateTokensAboveThreshold),
+            35.5,
+            accuracy: 0.000_001
+        )
     }
 
     func testAggregatorCollapsesFamiliesAcrossRanges() {

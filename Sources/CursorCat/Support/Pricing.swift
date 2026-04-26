@@ -42,8 +42,6 @@ struct TokenUsage {
 }
 
 enum Pricing {
-    static let maxModeUplift: Double = 1.2
-
     struct ModelFamily {
         let id: String
         let displayName: String
@@ -102,31 +100,25 @@ enum Pricing {
         return ModelFamily(id: entry.familyID, displayName: entry.familyDisplayName)
     }
 
-    /// Estimate the USD cost (dollars, not cents) for one usage row, applying
-    /// long-context multipliers and MAX_MODE uplift where applicable.
+    /// Estimate the USD cost (dollars, not cents) for one dashboard CSV row.
+    ///
+    /// Cursor's CSV rows are aggregates, not individual model requests: a single
+    /// row can contain more tokens than a model's context window. Because
+    /// long-context pricing thresholds apply per request, not to an aggregate
+    /// row total, we cannot infer those multipliers from the CSV safely.
+    /// Current Cursor individual plans bill Max Mode at the model API rate.
+    /// Legacy request-based plans may have had a surcharge, but the CSV does not
+    /// expose enough plan context to apply one reliably.
     /// Returns 0 for unpriced/unknown models.
-    static func estimatedCostDollars(model: String, maxMode: Bool, tokens: TokenUsage) -> Double {
+    static func estimatedCostDollars(model: String, maxMode _: Bool, tokens: TokenUsage) -> Double {
         guard let entry = pricingEntry(for: model) else { return 0 }
 
-        let totalInput = tokens.inputCacheWrite + tokens.inputNoCacheWrite + tokens.cacheRead
-        var inputMult = 1.0
-        var outputMult = 1.0
-        var cachedInputMult = 1.0
-        if let threshold = entry.longContextInputThreshold, totalInput > threshold {
-            inputMult = entry.longContextInputMultiplier ?? 1.0
-            outputMult = entry.longContextOutputMultiplier ?? 1.0
-            cachedInputMult = entry.longContextCachedInputMultiplier ?? inputMult
-        }
+        let cost =
+            Double(tokens.inputCacheWrite) / 1_000_000 * entry.cacheWritePerMillion +
+            Double(tokens.inputNoCacheWrite) / 1_000_000 * entry.inputPerMillion +
+            Double(tokens.cacheRead) / 1_000_000 * entry.cacheReadPerMillion +
+            Double(tokens.output) / 1_000_000 * entry.outputPerMillion
 
-        var cost =
-            Double(tokens.inputCacheWrite) / 1_000_000 * entry.cacheWritePerMillion * inputMult +
-            Double(tokens.inputNoCacheWrite) / 1_000_000 * entry.inputPerMillion * inputMult +
-            Double(tokens.cacheRead) / 1_000_000 * entry.cacheReadPerMillion * cachedInputMult +
-            Double(tokens.output) / 1_000_000 * entry.outputPerMillion * outputMult
-
-        if maxMode && entry.applyMaxModeUplift {
-            cost *= maxModeUplift
-        }
         return cost
     }
 

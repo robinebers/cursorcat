@@ -31,13 +31,20 @@ Prefer these canonical scripts over improvising new commands. They are also surf
 - `APP_VERSION` / `APP_BUILD` — override bundle version metadata for `package_release.sh`.
 - `SPARKLE_PUBLIC_ED_KEY_FILE` / `SPARKLE_PRIVATE_KEY_FILE` / `SPARKLE_PUBLIC_ED_KEY` — override Sparkle key discovery (defaults `~/.cursorcat/sparkle/public_ed_key.txt` + `~/.cursorcat/sparkle/private_ed25519.pem`).
 
-## Publishing A GitHub Release
+## Release Flow
 
-`./script/publish_release.sh` tags, builds, signs, notarizes, DMGs, creates the GitHub release, and publishes the Sparkle appcast in one go. **Never run without an explicit user request** — it pushes a version tag and publishes publicly.
+Use `./script/publish_release.sh` as the canonical release path. Do not manually invent version numbers from checked-in defaults such as `project.yml`, `build_and_run.sh`, or `package_release.sh`; those can lag behind the public release. The release script resolves the next patch from the latest `vX.Y.Z` git tag unless the user provides an explicit `vX.Y.Z`.
+
+When the user asks to create a patch release/version and does not specify a version:
+
+1. Confirm the latest public version from tags or GitHub releases, then use the next patch version.
+2. Run the existing release script rather than hand-rolling steps: `./script/publish_release.sh` for a real release, or `./script/publish_release.sh --dry-run` when validating only.
+3. The release flow must build, sign, notarize, create the DMG/app bundle artifact, create/push the version tag, create the GitHub release with `gh`, upload the artifact, and publish the Sparkle appcast.
+4. Do not run `publish_release.sh` without an explicit user request, because it pushes a tag and publishes publicly.
 
 Flags:
 
-- `vX.Y.Z` — explicit version (otherwise next patch bump; prompts in a TTY).
+- `vX.Y.Z` — explicit version; otherwise the script uses the next patch version from the latest release tag.
 - `--dry-run` — prints what would happen without tagging/pushing/releasing.
 - `--skip-package` — reuses the existing `dist/release/` artifact.
 - `--allow-dirty` — bypasses the clean-worktree check.
