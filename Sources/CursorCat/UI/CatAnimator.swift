@@ -134,25 +134,11 @@ final class CatAnimator {
         case .sleeping:
             // Hard state lock: up to ~1 h before self-cancelling. In practice
             // the next interaction / poll wakes the cat long before that.
-            if animationFrame < sleepTiredTicks {
-                emit(sprite: .tired, frame: 0)
-            } else {
-                let offset = animationFrame - sleepTiredTicks
-                emit(sprite: .sleeping, frame: offset / sleepFrameHoldTicks)
-            }
-            if animationFrame > sleepTotalTicks { resetAnimation() }
-            animationFrame += 1
+            emitSleepingFrame(until: sleepTotalTicks)
 
         case .sleepBrief:
             // Short scheduled nap: 60 s cap.
-            if animationFrame < sleepTiredTicks {
-                emit(sprite: .tired, frame: 0)
-            } else {
-                let offset = animationFrame - sleepTiredTicks
-                emit(sprite: .sleeping, frame: offset / sleepFrameHoldTicks)
-            }
-            if animationFrame > sleepBriefTotalTicks { resetAnimation() }
-            animationFrame += 1
+            emitSleepingFrame(until: sleepBriefTotalTicks)
 
         case .scratching, .scratchHead:
             emit(sprite: .scratchSelf, frame: animationFrame)
@@ -207,6 +193,17 @@ final class CatAnimator {
         let index = (animationFrame / scratchWallFrameTicks) % frames.count
         emit(cell: frames[index])
         if animationFrame > scratchWallTotalTicks { resetAnimation() }
+        animationFrame += 1
+    }
+
+    private func emitSleepingFrame(until totalTicks: Int) {
+        if animationFrame < sleepTiredTicks {
+            emit(sprite: .tired, frame: 0)
+        } else {
+            let offset = animationFrame - sleepTiredTicks
+            emit(sprite: .sleeping, frame: offset / sleepFrameHoldTicks)
+        }
+        if animationFrame > totalTicks { resetAnimation() }
         animationFrame += 1
     }
 

@@ -30,19 +30,8 @@ final class UserSettings: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        if let rawValue = defaults.string(forKey: Keys.costMode),
-           let storedMode = CostMode(rawValue: rawValue) {
-            costMode = storedMode
-        } else {
-            costMode = .rawAPI
-        }
-
-        if let data = defaults.data(forKey: Keys.globalShortcut),
-           let shortcut = try? decoder.decode(GlobalShortcut.self, from: data) {
-            globalShortcut = shortcut
-        } else {
-            globalShortcut = nil
-        }
+        costMode = defaults.string(forKey: Keys.costMode).flatMap(CostMode.init(rawValue:)) ?? .rawAPI
+        globalShortcut = defaults.data(forKey: Keys.globalShortcut).flatMap { try? decoder.decode(GlobalShortcut.self, from: $0) }
     }
 
     private func persistGlobalShortcut() {

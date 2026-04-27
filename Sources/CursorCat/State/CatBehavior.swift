@@ -46,7 +46,7 @@ final class CatBehavior {
             .sink { [weak self] snap in
                 MainActor.assumeIsolated { self?.onSnapshot(snap) }
             }
-        scheduleTicker()
+        scheduleNextEventTimer()
     }
 
     func stop() {
@@ -113,10 +113,6 @@ final class CatBehavior {
     }
 
     // MARK: - Ticking
-
-    private func scheduleTicker() {
-        scheduleNextEventTimer()
-    }
 
     private func scheduleNextEventTimer() {
         nextEventTimer?.invalidate()

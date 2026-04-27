@@ -65,25 +65,12 @@ final class ActionsMenuBuilder {
         menu.autoenablesItems = false
 
         if !isLoggedIn {
-            let open = NSMenuItem(title: "Open Cursor to log in",
-                                  action: openCursorSelector,
-                                  keyEquivalent: "")
-            open.target = target
-            menu.addItem(open)
+            menu.addItem(makeItem(title: "Open Cursor to log in", action: openCursorSelector))
             menu.addItem(.separator())
         }
 
-        let cloud = NSMenuItem(title: "Cloud agents",
-                               action: openCloudAgentsSelector,
-                               keyEquivalent: "")
-        cloud.target = target
-        menu.addItem(cloud)
-
-        let status = NSMenuItem(title: "Cursor status",
-                                action: openStatusSelector,
-                                keyEquivalent: "")
-        status.target = target
-        menu.addItem(status)
+        menu.addItem(makeItem(title: "Cloud agents", action: openCloudAgentsSelector))
+        menu.addItem(makeItem(title: "Cursor status", action: openStatusSelector))
 
         menu.addItem(.separator())
 
@@ -91,36 +78,30 @@ final class ActionsMenuBuilder {
 
         menu.addItem(.separator())
 
-        let checkForUpdates = NSMenuItem(title: "Check for Updates…",
-                                         action: checkForUpdatesSelector,
-                                         keyEquivalent: "")
-        checkForUpdates.target = target
-        checkForUpdates.isEnabled = canCheckForUpdates
-        menu.addItem(checkForUpdates)
-
-        let about = NSMenuItem(title: "About",
-                               action: aboutSelector,
-                               keyEquivalent: "")
-        about.target = target
-        menu.addItem(about)
-
-        let quit = NSMenuItem(title: "Quit",
-                              action: quitSelector,
-                              keyEquivalent: "q")
-        quit.target = target
-        menu.addItem(quit)
+        menu.addItem(makeItem(title: "Check for Updates…",
+                              action: checkForUpdatesSelector,
+                              isEnabled: canCheckForUpdates))
+        menu.addItem(makeItem(title: "About", action: aboutSelector))
+        menu.addItem(makeItem(title: "Quit", action: quitSelector, keyEquivalent: "q"))
 
         return menu
+    }
+
+    private func makeItem(title: String,
+                          action: Selector,
+                          keyEquivalent: String = "",
+                          isEnabled: Bool = true) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
+        item.target = target
+        item.isEnabled = isEnabled
+        return item
     }
 
     private func makeInteractItem() -> NSMenuItem {
         let parent = NSMenuItem(title: "Interact", action: nil, keyEquivalent: "")
         let sub = NSMenu(title: "Interact")
         for entry in InteractionMenuAction.allCases {
-            let item = NSMenuItem(title: entry.title,
-                                  action: interactSelector,
-                                  keyEquivalent: "")
-            item.target = target
+            let item = makeItem(title: entry.title, action: interactSelector)
             item.tag = entry.rawValue
             sub.addItem(item)
         }

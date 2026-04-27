@@ -13,13 +13,11 @@ final class AppUpdater: NSObject, ObservableObject {
 
         var version: String? {
             switch self {
-            case .idle:
-                return nil
+            case .idle: nil
             case .available(let version),
                  .downloading(let version),
                  .ready(let version),
-                 .installing(let version):
-                return version
+                 .installing(let version): version
             }
         }
 
@@ -29,30 +27,23 @@ final class AppUpdater: NSObject, ObservableObject {
 
         var isBusy: Bool {
             switch self {
-            case .downloading, .installing:
-                return true
-            case .idle, .available, .ready:
-                return false
+            case .downloading, .installing: true
+            case .idle, .available, .ready: false
             }
         }
 
         var isInstallEnabled: Bool {
             switch self {
-            case .available, .ready:
-                return true
-            case .idle, .downloading, .installing:
-                return false
+            case .available, .ready: true
+            case .idle, .downloading, .installing: false
             }
         }
 
         var buttonTitle: String {
             switch self {
-            case .idle, .available, .ready:
-                return "New version! Restart now."
-            case .downloading:
-                return "Downloading…"
-            case .installing:
-                return "Restarting…"
+            case .idle, .available, .ready: "New version! Restart now."
+            case .downloading: "Downloading…"
+            case .installing: "Restarting…"
             }
         }
     }
@@ -131,11 +122,8 @@ final class AppUpdater: NSObject, ObservableObject {
         alert.messageText = "About \(AppMetadata.displayName)"
 
         let credit = "Made by Robin Ebers"
-        if isConfigured {
-            alert.informativeText = "Version \(AppMetadata.versionDescription)\n\(credit)"
-        } else {
-            alert.informativeText = "Version \(AppMetadata.versionDescription)\n\(credit)\nAutomatic updates are not configured for this build."
-        }
+        let updateWarning = isConfigured ? "" : "\nAutomatic updates are not configured for this build."
+        alert.informativeText = "Version \(AppMetadata.versionDescription)\n\(credit)\(updateWarning)"
 
         alert.addButton(withTitle: "OK")
         alert.runModal()
@@ -170,33 +158,23 @@ extension AppUpdater: SPUUpdaterDelegate {
     }
 
     func updater(_ updater: SPUUpdater, didDownloadUpdate item: SUAppcastItem) {
-        let version = versionString(for: item)
-        pendingUpdateItem = item
-        installState = .downloading(version: version)
+        setPendingUpdate(item) { .downloading(version: $0) }
     }
 
     func updater(_ updater: SPUUpdater, willExtractUpdate item: SUAppcastItem) {
-        let version = versionString(for: item)
-        pendingUpdateItem = item
-        installState = .downloading(version: version)
+        setPendingUpdate(item) { .downloading(version: $0) }
     }
 
     func updater(_ updater: SPUUpdater, didExtractUpdate item: SUAppcastItem) {
-        let version = versionString(for: item)
-        pendingUpdateItem = item
-        installState = .downloading(version: version)
+        setPendingUpdate(item) { .downloading(version: $0) }
     }
 
     func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
-        let version = versionString(for: item)
-        pendingUpdateItem = item
-        installState = .installing(version: version)
+        setPendingUpdate(item) { .installing(version: $0) }
     }
 
     func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: Error) {
-        let version = versionString(for: item)
-        pendingUpdateItem = item
-        installState = .available(version: version)
+        setPendingUpdate(item) { .available(version: $0) }
     }
 
     func userDidCancelDownload(_ updater: SPUUpdater) {
@@ -272,6 +250,11 @@ extension AppUpdater: SPUStandardUserDriverDelegate {
             return item.displayVersionString
         }
         return item.versionString
+    }
+
+    private func setPendingUpdate(_ item: SUAppcastItem, to state: (String) -> InstallState) {
+        pendingUpdateItem = item
+        installState = state(versionString(for: item))
     }
 
     private func restorePendingState() {

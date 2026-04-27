@@ -15,14 +15,11 @@ struct DashboardHeaderView: View {
                                       weight: .semibold,
                                       design: .rounded))
                         .monospacedDigit()
+                    DeltaRow(summary: summary)
                 } else {
                     ProgressView()
                         .controlSize(.small)
                         .padding(.vertical, 8)
-                }
-
-                if let summary {
-                    DeltaRow(summary: summary)
                 }
             }
         }

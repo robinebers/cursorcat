@@ -126,9 +126,6 @@ enum UsageSnapshotProjector {
         } else if api.stripeBalanceCents > 0 {
             next.creditsLeft = api.stripeBalanceCents
             next.creditsTotal = api.stripeBalanceCents
-        } else {
-            next.creditsLeft = nil
-            next.creditsTotal = nil
         }
 
         return next
