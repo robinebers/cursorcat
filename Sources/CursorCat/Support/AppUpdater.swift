@@ -246,10 +246,7 @@ extension AppUpdater: SPUStandardUserDriverDelegate {
     }
 
     private func versionString(for item: SUAppcastItem) -> String {
-        if !item.displayVersionString.isEmpty {
-            return item.displayVersionString
-        }
-        return item.versionString
+        item.displayVersionString.isEmpty ? item.versionString : item.displayVersionString
     }
 
     private func setPendingUpdate(_ item: SUAppcastItem, to state: (String) -> InstallState) {
@@ -265,10 +262,6 @@ extension AppUpdater: SPUStandardUserDriverDelegate {
         }
 
         let version = versionString(for: pendingUpdateItem)
-        if immediateInstallBlock != nil {
-            installState = .ready(version: version)
-        } else {
-            installState = .available(version: version)
-        }
+        installState = immediateInstallBlock != nil ? .ready(version: version) : .available(version: version)
     }
 }
