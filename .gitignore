@@ -4,6 +4,7 @@
 dist/
 *.log
 .codex/cache/
+.claude/
 docs/plans/
 *.xcuserstate
 xcuserdata/
