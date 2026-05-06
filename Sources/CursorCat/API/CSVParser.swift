@@ -1,10 +1,25 @@
 import Foundation
 
 /// Minimal CSV parser supporting quoted fields with embedded commas, newlines,
-/// and escaped quotes (`""` → `"`). Returns rows as string arrays.
+/// and escaped quotes (`""` → `"`). Streams records keyed by the header row.
 enum CSVParser {
-    static func parse(_ text: String) -> [[String]] {
-        var rows: [[String]] = []
+    static func forEachRecord(in text: String, _ body: ([String: String]) -> Void) {
+        var header: [String]?
+        forEachRow(in: text) { row in
+            guard let keys = header else {
+                header = row
+                return
+            }
+
+            var dict: [String: String] = [:]
+            for (i, key) in keys.enumerated() where i < row.count {
+                dict[key] = row[i]
+            }
+            body(dict)
+        }
+    }
+
+    private static func forEachRow(in text: String, _ body: ([String]) -> Void) {
         var field = ""
         var row: [String] = []
         var inQuotes = false
@@ -42,7 +57,7 @@ enum CSVParser {
                 break
             case "\n":
                 row.append(field)
-                rows.append(row)
+                emit(row, body)
                 row = []
                 field = ""
             default:
@@ -54,22 +69,13 @@ enum CSVParser {
         // Trailing partial row.
         if !field.isEmpty || !row.isEmpty {
             row.append(field)
-            rows.append(row)
+            emit(row, body)
         }
-
-        return rows.filter { !$0.allSatisfy { $0.isEmpty } }
     }
 
-    /// Parse into `[rowDict]` keyed by header. Returns `[]` if no header row.
-    static func parseRecords(_ text: String) -> [[String: String]] {
-        let rows = parse(text)
-        guard let header = rows.first else { return [] }
-        return rows.dropFirst().map { row in
-            var dict: [String: String] = [:]
-            for (i, key) in header.enumerated() where i < row.count {
-                dict[key] = row[i]
-            }
-            return dict
+    private static func emit(_ row: [String], _ body: ([String]) -> Void) {
+        if !row.allSatisfy(\.isEmpty) {
+            body(row)
         }
     }
 }

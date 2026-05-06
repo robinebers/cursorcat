@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-enum CostMode: String, Codable {
+enum CostMode: String, Codable, CaseIterable, Hashable {
     case actual
     case rawAPI
 }

@@ -20,6 +20,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private var cancellables: Set<AnyCancellable> = []
     private var latestSnapshot: UsageSnapshot = .loading
     private var latestViewState: UsageViewState = .loading
+    private var displayedTitle = ""
+    private weak var displayedImage: NSImage?
     private lazy var menuBuilder = ActionsMenuBuilder(
         target: self,
         checkForUpdatesSelector: #selector(checkForUpdates),
@@ -50,7 +52,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         configurePopover()
         configureStatusButton()
         animator.onFrame = { [weak self] image in
-            self?.statusItem.button?.image = image
+            self?.setStatusImage(image)
         }
         animator.start()
         observeStore()
@@ -73,7 +75,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     private func configureStatusButton() {
-        statusItem.button?.title = " …"
+        setStatusTitle(" …")
         statusItem.button?.imagePosition = .imageLeft
         guard let button = statusItem.button else { return }
         button.action = #selector(handleStatusButton(_:))
@@ -119,18 +121,30 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         switch viewState {
         case .loggedOut:
             animator.setState(.sleeping)
-            statusItem.button?.title = " Not logged in"
+            setStatusTitle(" Not logged in")
         case .loading:
             animator.setState(updater.shouldShowAlertCat ? .alert : .idle)
-            statusItem.button?.title = " …"
+            setStatusTitle(" …")
         case .failed:
             animator.setState(.error)
-            statusItem.button?.title = " ⚠"
+            setStatusTitle(" ⚠")
         case .loaded:
             animator.setState(updater.shouldShowAlertCat ? .alert : .idle)
             let spend = snapshot.todaySpend ?? 0
-            statusItem.button?.title = " \(Money.format(cents: spend))"
+            setStatusTitle(" \(Money.format(cents: spend))")
         }
+    }
+
+    private func setStatusTitle(_ title: String) {
+        guard displayedTitle != title else { return }
+        displayedTitle = title
+        statusItem.button?.title = title
+    }
+
+    private func setStatusImage(_ image: NSImage) {
+        guard displayedImage !== image else { return }
+        displayedImage = image
+        statusItem.button?.image = image
     }
 
     // MARK: - Click handling

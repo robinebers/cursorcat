@@ -59,7 +59,14 @@ enum CatRenderer {
     }
 
     @MainActor
-    private static var cache: [String: NSImage] = [:]
+    private struct CacheKey: Hashable {
+        let col: Int
+        let row: Int
+        let breathLifted: Bool
+    }
+
+    @MainActor
+    private static var cache: [CacheKey: NSImage] = [:]
 
     /// Row in the 32-pixel cell where the cat's sitting torso starts. Rows at
     /// or below this row stay fixed during breath; rows above get sampled one
@@ -72,7 +79,7 @@ enum CatRenderer {
     /// torso and paws stay perfectly still.
     @MainActor
     static func image(for cell: (Int, Int), breathLifted: Bool = false) -> NSImage {
-        let key = "\(cell.0),\(cell.1):\(breathLifted)"
+        let key = CacheKey(col: cell.0, row: cell.1, breathLifted: breathLifted)
         if let cached = cache[key] { return cached }
         let img = extractSprite(col: cell.0, row: cell.1, breathLifted: breathLifted)
         cache[key] = img

@@ -216,9 +216,7 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
                 makeRow(date: date("2026-04-05T09:00:00Z"), model: "composer-2-fast", tokenTotal: 100, costDollars: 6.00),
                 makeRow(date: date("2026-03-10T09:00:00Z"), model: "composer-2-fast", tokenTotal: 100, costDollars: 5.00)
             ],
-            stripeBalanceCents: 0,
-            csvStart: date("2026-03-10T00:00:00Z"),
-            csvEnd: now
+            stripeBalanceCents: 0
         )
 
         let snapshot = UsageSnapshotProjector.project(
@@ -232,6 +230,43 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(snapshot.rangeSummaries[DashboardRange.yesterday], DashboardRangeSummary(totalCents: 200, comparisonCents: 100, comparisonLabel: "vs. today"))
         XCTAssertEqual(snapshot.rangeSummaries[DashboardRange.billingCycle], DashboardRangeSummary(totalCents: 600, comparisonCents: 1000, comparisonLabel: "vs. prev billing cycle"))
         XCTAssertEqual(snapshot.rangeSummaries[DashboardRange.last30Days], DashboardRangeSummary(totalCents: 1600, comparisonCents: 500, comparisonLabel: "vs. prev. 30 days"))
+    }
+
+    @MainActor
+    func testUsageStoreSwitchesCostModeFromProjectedCache() {
+        let suiteName = "CursorCatTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = UserSettings(defaults: defaults)
+        let store = UsageStore(settings: settings)
+        let now = date("2026-04-19T12:00:00Z")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        store.applySnapshot(
+            APISnapshot(
+                usage: nil,
+                plan: nil,
+                credits: nil,
+                csvRows: [
+                    makeRow(
+                        date: date("2026-04-19T09:00:00Z"),
+                        model: "composer-2-fast",
+                        tokenTotal: 100,
+                        costDollars: 1.00,
+                        csvCost: "$2.50"
+                    )
+                ],
+                stripeBalanceCents: 0
+            ),
+            now: now,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(store.snapshot.todaySpend, 100)
+        settings.costMode = .actual
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        XCTAssertEqual(store.snapshot.todaySpend, 250)
     }
 
     func testCSVWindowStartsAtPreviousBillingCycleStart() {
@@ -276,7 +311,6 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         UsageCSVRow(
             date: date,
             model: model,
-            canonicalModel: Pricing.canonicalModel(for: model),
             maxMode: false,
             tokens: TokenUsage(
                 inputCacheWrite: tokenTotal,

@@ -7,10 +7,6 @@ struct APISnapshot {
     var credits: GetCreditGrantsBalanceResponse?
     var csvRows: [UsageCSVRow]
     var stripeBalanceCents: Int
-    /// The CSV window actually fetched. Useful for menu footer / debugging.
-    var csvStart: Date
-    var csvEnd: Date
-
 }
 
 /// Orchestrates one fan-out poll: RPC trio + CSV + Stripe.
@@ -32,19 +28,13 @@ actor CursorAPI {
     }
 
     func collectRawDump() async -> String {
-        let rpcRaw = await rpc.snapshotRaw()
-        let csvRaw = await csv.snapshotRawCSV()
+        let rpcRaw = await rpc.snapshotRawPreviews()
+        let csvSummary = await csv.snapshotRawCSVSummary()
         var parts: [String] = []
         for (path, body) in rpcRaw.sorted(by: { $0.key < $1.key }) {
             parts.append("=== RPC \(path) ===\n\(body)")
         }
-        parts.append("=== CSV (\(csvRaw.count) bytes) ===\n\(csvRaw.prefix(4000))")
-        // Also surface date-range metadata.
-        let lines = csvRaw.split(separator: "\n")
-        let dataLines = lines.dropFirst()
-        let firstDate = dataLines.first.map { String($0.prefix(40)) } ?? "n/a"
-        let lastDate = dataLines.last.map { String($0.prefix(40)) } ?? "n/a"
-        parts.append("=== CSV date range ===\nfirst: \(firstDate)\nlast:  \(lastDate)\nrows:  \(dataLines.count)")
+        parts.append("=== CSV ===\n\(csvSummary)")
         return parts.joined(separator: "\n\n")
     }
 
@@ -95,9 +85,7 @@ actor CursorAPI {
                 plan: planVal,
                 credits: creditsVal,
                 csvRows: rowsVal,
-                stripeBalanceCents: stripeVal,
-                csvStart: start,
-                csvEnd: end
+                stripeBalanceCents: stripeVal
             )
         }
     }

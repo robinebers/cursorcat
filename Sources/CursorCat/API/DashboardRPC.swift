@@ -5,7 +5,7 @@ actor DashboardRPC {
     static let baseURL = URL(string: "https://api2.cursor.sh")!
 
     private let session: URLSession
-    private(set) var lastRaw: [String: String] = [:]
+    private var lastRawPreviews: [String: String] = [:]
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -23,7 +23,7 @@ actor DashboardRPC {
         try await post(path: "/aiserver.v1.DashboardService/GetCreditGrantsBalance", token: token)
     }
 
-    func snapshotRaw() -> [String: String] { lastRaw }
+    func snapshotRawPreviews() -> [String: String] { lastRawPreviews }
 
     private func post<T: Decodable>(path: String, token: String) async throws -> T {
         var req = URLRequest(url: Self.baseURL.appendingPathComponent(path))
@@ -45,7 +45,7 @@ actor DashboardRPC {
             throw HTTPError.status(http.statusCode)
         }
         if let body = String(data: data, encoding: .utf8) {
-            lastRaw[path] = body
+            lastRawPreviews[path] = String(body.prefix(4000))
         }
         do {
             return try JSONDecoder().decode(T.self, from: data)

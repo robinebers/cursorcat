@@ -11,6 +11,10 @@ final class EventMonitor {
         self.handler = handler
     }
 
+    deinit {
+        stop()
+    }
+
     func start() {
         stop()
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask, handler: handler)

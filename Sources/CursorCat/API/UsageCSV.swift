@@ -6,7 +6,6 @@ import Foundation
 struct UsageCSVRow {
     var date: Date
     var model: String
-    var canonicalModel: String?
     var maxMode: Bool
     var tokens: TokenUsage
     var imputedCostDollars: Double
@@ -46,15 +45,6 @@ extension UsageCSVRow {
         return .charged(amount)
     }
 
-    var actualCostDollars: Double? {
-        switch actualCostKind {
-        case .charged(let amount):
-            return amount
-        case .included, .unavailable:
-            return nil
-        }
-    }
-
     func costDollars(for mode: CostMode) -> Double {
         switch mode {
         case .actual:
@@ -81,13 +71,25 @@ actor UsageCSVClient {
     static let exportURL = URL(string: "https://cursor.com/api/dashboard/export-usage-events-csv")!
 
     private let session: URLSession
-    private(set) var lastRawCSV: String = ""
+    private var lastRawCSVPreview = ""
+    private var lastFetchByteCount = 0
+    private var lastCSVRowCount = 0
+    private var lastCSVFirstDate = "n/a"
+    private var lastCSVLastDate = "n/a"
 
     init(session: URLSession = .shared) {
         self.session = session
     }
 
-    func snapshotRawCSV() -> String { lastRawCSV }
+    func snapshotRawCSVSummary() -> String {
+        """
+        preview: \(lastRawCSVPreview)
+        bytes: \(lastFetchByteCount)
+        first: \(lastCSVFirstDate)
+        last: \(lastCSVLastDate)
+        rows: \(lastCSVRowCount)
+        """
+    }
 
     func fetch(sessionToken: String, start: Date, end: Date) async throws -> [UsageCSVRow] {
         var comps = URLComponents(url: Self.exportURL, resolvingAgainstBaseURL: false)!
@@ -116,13 +118,17 @@ actor UsageCSVClient {
         guard let csv = String(data: data, encoding: .utf8) else {
             throw URLError(.cannotDecodeContentData)
         }
-        lastRawCSV = csv
-        return Self.parse(csv: csv)
+        lastFetchByteCount = data.count
+        lastRawCSVPreview = String(csv.prefix(4000))
+        let rows = Self.parse(csv: csv)
+        lastCSVRowCount = rows.count
+        lastCSVFirstDate = rows.first.map { Self.formatSummaryDate($0.date) } ?? "n/a"
+        lastCSVLastDate = rows.last.map { Self.formatSummaryDate($0.date) } ?? "n/a"
+        return rows
     }
 
-    /// Expose parser for tests and debug menu. Pure function.
+    /// Expose parser for tests. Pure function.
     static func parse(csv: String) -> [UsageCSVRow] {
-        let records = CSVParser.parseRecords(csv)
         let isoFractional: ISO8601DateFormatter = {
             let f = ISO8601DateFormatter()
             f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -134,11 +140,12 @@ actor UsageCSVClient {
             return f
         }()
 
-        return records.compactMap { r in
+        var rows: [UsageCSVRow] = []
+        CSVParser.forEachRecord(in: csv) { r in
             guard let dateStr = r["Date"]?.trimmingCharacters(in: .whitespaces),
                   !dateStr.isEmpty,
                   let date = parseDate(dateStr, iso: iso, isoFractional: isoFractional)
-            else { return nil }
+            else { return }
 
             let model = (r["Model"] ?? "").trimmingCharacters(in: .whitespaces)
             let maxMode = (r["Max Mode"] ?? "").trimmingCharacters(in: .whitespaces).lowercased() == "yes"
@@ -148,19 +155,18 @@ actor UsageCSVClient {
                 cacheRead: parseIntValue(r["Cache Read"] ?? ""),
                 output: parseIntValue(r["Output Tokens"] ?? "")
             )
-            let canonical = Pricing.canonicalModel(for: model)
             let imputed = Pricing.estimatedCostDollars(model: model, maxMode: maxMode, tokens: tokens)
 
-            return UsageCSVRow(
+            rows.append(UsageCSVRow(
                 date: date,
                 model: model,
-                canonicalModel: canonical,
                 maxMode: maxMode,
                 tokens: tokens,
                 imputedCostDollars: imputed,
                 csvCost: (r["Cost"] ?? "").trimmingCharacters(in: .whitespaces)
-            )
+            ))
         }
+        return rows
     }
 
     private static func parseDate(
@@ -181,5 +187,11 @@ actor UsageCSVClient {
                             .trimmingCharacters(in: .whitespaces)
         if normalized.isEmpty { return 0 }
         return Int(normalized) ?? 0
+    }
+
+    private static func formatSummaryDate(_ date: Date) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f.string(from: date)
     }
 }

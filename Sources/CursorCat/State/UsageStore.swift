@@ -34,7 +34,7 @@ struct UsageSnapshot: Equatable {
 @MainActor
 final class UsageStore: ObservableObject {
     private let settings: UserSettings
-    private var latestAPISnapshot: APISnapshot?
+    private var projectedSnapshots: [CostMode: UsageSnapshot] = [:]
     private var cancellables: Set<AnyCancellable> = []
 
     @Published private(set) var snapshot: UsageSnapshot = .loading
@@ -53,18 +53,20 @@ final class UsageStore: ObservableObject {
     }
 
     func applySnapshot(_ api: APISnapshot, now: Date = Date(), calendar: Calendar = .current) {
-        latestAPISnapshot = api
-        snapshot = UsageSnapshotProjector.project(
-            api: api,
-            costMode: settings.costMode,
-            now: now,
-            calendar: calendar
-        )
+        projectedSnapshots = Dictionary(uniqueKeysWithValues: CostMode.allCases.map { mode in
+            (mode, UsageSnapshotProjector.project(
+                api: api,
+                costMode: mode,
+                now: now,
+                calendar: calendar
+            ))
+        })
+        snapshot = projectedSnapshots[settings.costMode] ?? .loading
         viewState = .loaded
     }
 
     func setLoggedOut() {
-        latestAPISnapshot = nil
+        projectedSnapshots.removeAll(keepingCapacity: false)
         snapshot = UsageSnapshot(lastUpdated: snapshot.lastUpdated, isLoggedIn: false)
         viewState = .loggedOut
     }
@@ -81,16 +83,12 @@ final class UsageStore: ObservableObject {
     }
 
     private func reprojectLatestSnapshot() {
-        guard let latestAPISnapshot, viewState != .loggedOut else { return }
+        guard let projected = projectedSnapshots[settings.costMode], viewState != .loggedOut else { return }
 
         let preservedLastUpdated = snapshot.lastUpdated
         let preservedLastError = snapshot.lastError
         let preservedViewState = viewState
-        var next = UsageSnapshotProjector.project(
-            api: latestAPISnapshot,
-            costMode: settings.costMode,
-            now: preservedLastUpdated ?? Date()
-        )
+        var next = projected
         next.lastUpdated = preservedLastUpdated
         if preservedViewState != .loaded {
             next.lastError = preservedLastError

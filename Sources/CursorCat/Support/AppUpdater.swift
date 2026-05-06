@@ -60,7 +60,6 @@ final class AppUpdater: NSObject, ObservableObject {
     @Published private(set) var installState: InstallState = .idle
 
     private var updaterController: SPUStandardUpdaterController?
-    private var startupCheckPerformed = false
     private var pendingUpdateItem: SUAppcastItem?
     private var immediateInstallBlock: (() -> Void)?
 
@@ -91,13 +90,6 @@ final class AppUpdater: NSObject, ObservableObject {
     func start() {
         guard let updaterController else { return }
         updaterController.startUpdater()
-
-        guard !startupCheckPerformed else { return }
-        startupCheckPerformed = true
-
-        if updaterController.updater.automaticallyChecksForUpdates {
-            updaterController.updater.checkForUpdatesInBackground()
-        }
     }
 
     func checkForUpdates() {
