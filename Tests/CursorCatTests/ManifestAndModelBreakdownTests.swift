@@ -5,7 +5,7 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
     func testBundledManifestLoadsFamilyMetadata() throws {
         let manifest = try BundledModelManifestSource().loadManifest()
 
-        XCTAssertEqual(manifest.retrievedAt, "2026-04-19")
+        XCTAssertEqual(manifest.retrievedAt, "2026-05-19")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyID, "claude-4.7-opus")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyDisplayName, "Claude 4.7 Opus")
 
@@ -22,12 +22,31 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(gpt55.longContextInputThreshold, 272_000)
         XCTAssertEqual(gpt55.longContextInputMultiplier, 2.0)
         XCTAssertEqual(gpt55.longContextOutputMultiplier, 1.5)
+
+        let composer25 = try XCTUnwrap(manifest.pricing["composer-2.5"])
+        let composer25Fast = try XCTUnwrap(manifest.pricing["composer-2.5-fast"])
+        XCTAssertEqual(composer25.inputPerMillion, 0.5)
+        XCTAssertEqual(composer25.cacheReadPerMillion, 0.2)
+        XCTAssertEqual(composer25.outputPerMillion, 2.5)
+        XCTAssertEqual(composer25Fast.inputPerMillion, 3.0)
+        XCTAssertEqual(composer25Fast.cacheReadPerMillion, 0.5)
+        XCTAssertEqual(composer25Fast.outputPerMillion, 15.0)
+
+        let grok43 = try XCTUnwrap(manifest.pricing["grok-4.3"])
+        XCTAssertEqual(grok43.inputPerMillion, 1.25)
+        XCTAssertEqual(grok43.cacheReadPerMillion, 0.2)
+        XCTAssertEqual(grok43.outputPerMillion, 2.5)
     }
 
     func testPricingResolvesModelFamily() {
         XCTAssertEqual(Pricing.family(for: "claude-opus-4-7-high")?.displayName, "Claude 4.7 Opus")
         XCTAssertEqual(Pricing.family(for: "claude-opus-4-7-thinking-high")?.displayName, "Claude 4.7 Opus")
         XCTAssertEqual(Pricing.family(for: "composer-2-fast")?.displayName, "Composer 2")
+        XCTAssertEqual(Pricing.family(for: "composer-2.5")?.displayName, "Composer 2.5")
+        XCTAssertEqual(Pricing.family(for: "composer-2.5-fast")?.displayName, "Composer 2.5")
+        XCTAssertEqual(Pricing.family(for: "github_bugbot")?.displayName, "Bugbot Review")
+        XCTAssertEqual(Pricing.family(for: "github_bugbot")?.id, "github_bugbot")
+        XCTAssertEqual(Pricing.family(for: "grok-4.3")?.displayName, "Grok 4.3")
         XCTAssertEqual(Pricing.family(for: "gpt-5.3-codex-low-fast")?.displayName, "GPT-5.3 Codex")
         XCTAssertEqual(Pricing.family(for: "gpt-5.4-mini-high")?.displayName, "GPT-5.4 Mini")
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-high")?.displayName, "GPT-5.5")
@@ -35,6 +54,60 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-high-fast")?.displayName, "GPT-5.5")
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-extra-high-fast")?.displayName, "GPT-5.5")
         XCTAssertEqual(Pricing.family(for: "default")?.displayName, "Auto")
+    }
+
+    func testComposer25CostEstimation() {
+        let tokens = TokenUsage(
+            inputCacheWrite: 0,
+            inputNoCacheWrite: 100_000,
+            cacheRead: 100_000,
+            output: 100_000
+        )
+
+        XCTAssertEqual(
+            Pricing.estimatedCostDollars(model: "composer-2.5", maxMode: false, tokens: tokens),
+            0.32,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            Pricing.estimatedCostDollars(model: "composer-2.5-fast", maxMode: false, tokens: tokens),
+            1.85,
+            accuracy: 0.000_001
+        )
+        let gpt55Sample = TokenUsage(
+            inputCacheWrite: 0,
+            inputNoCacheWrite: 100_000,
+            cacheRead: 100_000,
+            output: 100_000
+        )
+        XCTAssertEqual(
+            Pricing.estimatedCostDollars(model: "github_bugbot", maxMode: false, tokens: gpt55Sample),
+            Pricing.estimatedCostDollars(model: "gpt-5.5-high", maxMode: false, tokens: gpt55Sample),
+            accuracy: 0.000_001
+        )
+    }
+
+    func testBugbotAggregatesAsSeparateFamilyFromGPT55() {
+        let now = date("2026-04-19T12:00:00Z")
+        let cycleStart = date("2026-04-15T00:00:00Z")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let rows = [
+            makeRow(date: date("2026-04-19T10:00:00Z"), model: "github_bugbot", tokenTotal: 1_000, costDollars: 1.0),
+            makeRow(date: date("2026-04-19T09:00:00Z"), model: "gpt-5.5-high", tokenTotal: 2_000, costDollars: 2.0)
+        ]
+
+        let breakdowns = ModelBreakdownAggregator.aggregate(
+            rows: rows,
+            billingCycleWindow: BillingCycleWindow(currentStart: cycleStart, previousStart: cycleStart),
+            costMode: .rawAPI,
+            now: now,
+            calendar: calendar
+        )
+
+        let todayNames = Set(breakdowns[.today]?.map(\.displayName) ?? [])
+        XCTAssertEqual(todayNames, ["Bugbot Review", "GPT-5.5"])
     }
 
     func testGPT55CostEstimationUsesStandardAndFastTiersSeparately() {

@@ -1,5 +1,6 @@
 # Repo Notes
 
+- `model_manifest.json`: when Cursor docs show `-` for cache write, set `cache_write_per_million` equal to `input_per_million` (not zero). Rates should match [Models & Pricing](https://cursor.com/docs/models-and-pricing); fast tiers may come from product UI when omitted from that table.
 - App icons: `Resources/AppIcon/AppIcon.icon` is consumed by Xcode, not by the shell bundle scripts. For script-built `.app` bundles, keep `Resources/AppIcon/AppIcon.icns` and `Resources/AppIcon/Assets.car` in sync with Xcode's compiled outputs and copy them into the bundle; also set `CFBundleIconFile=AppIcon` and `CFBundleIconName=AppIcon`.
 - Xcode Debug uses `script/CursorCat.dev.entitlements.plist`; Release should not.
 - If the repo path changes, clear `.build/` before rebuilding so SwiftPM does not reuse module-cache paths from the old location.
