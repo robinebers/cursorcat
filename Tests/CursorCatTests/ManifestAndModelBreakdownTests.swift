@@ -5,7 +5,7 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
     func testBundledManifestLoadsFamilyMetadata() throws {
         let manifest = try BundledModelManifestSource().loadManifest()
 
-        XCTAssertEqual(manifest.retrievedAt, "2026-05-19")
+        XCTAssertEqual(manifest.retrievedAt, "2026-05-23")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyID, "claude-4.7-opus")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyDisplayName, "Claude 4.7 Opus")
 
@@ -36,6 +36,12 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(grok43.inputPerMillion, 1.25)
         XCTAssertEqual(grok43.cacheReadPerMillion, 0.2)
         XCTAssertEqual(grok43.outputPerMillion, 2.5)
+
+        let grokBuild = try XCTUnwrap(manifest.pricing["grok-build-0.1"])
+        XCTAssertEqual(grokBuild.inputPerMillion, 1.0)
+        XCTAssertEqual(grokBuild.cacheWritePerMillion, 1.0)
+        XCTAssertEqual(grokBuild.cacheReadPerMillion, 0.2)
+        XCTAssertEqual(grokBuild.outputPerMillion, 2.0)
     }
 
     func testPricingResolvesModelFamily() {
@@ -47,6 +53,8 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(Pricing.family(for: "github_bugbot")?.displayName, "Bugbot Review")
         XCTAssertEqual(Pricing.family(for: "github_bugbot")?.id, "github_bugbot")
         XCTAssertEqual(Pricing.family(for: "grok-4.3")?.displayName, "Grok 4.3")
+        XCTAssertEqual(Pricing.family(for: "grok-build-0.1")?.displayName, "Grok Build 0.1")
+        XCTAssertEqual(Pricing.family(for: "grok-code-fast-1")?.displayName, "Grok Build 0.1")
         XCTAssertEqual(Pricing.family(for: "gpt-5.3-codex-low-fast")?.displayName, "GPT-5.3 Codex")
         XCTAssertEqual(Pricing.family(for: "gpt-5.4-mini-high")?.displayName, "GPT-5.4 Mini")
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-high")?.displayName, "GPT-5.5")
@@ -72,6 +80,11 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(
             Pricing.estimatedCostDollars(model: "composer-2.5-fast", maxMode: false, tokens: tokens),
             1.85,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            Pricing.estimatedCostDollars(model: "grok-build-0.1", maxMode: false, tokens: tokens),
+            0.32,
             accuracy: 0.000_001
         )
         let gpt55Sample = TokenUsage(
