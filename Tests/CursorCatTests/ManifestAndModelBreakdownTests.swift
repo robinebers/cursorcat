@@ -5,9 +5,23 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
     func testBundledManifestLoadsFamilyMetadata() throws {
         let manifest = try BundledModelManifestSource().loadManifest()
 
-        XCTAssertEqual(manifest.retrievedAt, "2026-05-23")
+        XCTAssertEqual(manifest.retrievedAt, "2026-05-28")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyID, "claude-4.7-opus")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyDisplayName, "Claude 4.7 Opus")
+
+        XCTAssertEqual(manifest.pricing["claude-4.8-opus"]?.familyID, "claude-4.8-opus")
+        XCTAssertEqual(manifest.pricing["claude-4.8-opus"]?.familyDisplayName, "Claude 4.8 Opus")
+        let opus48 = try XCTUnwrap(manifest.pricing["claude-4.8-opus"])
+        XCTAssertEqual(opus48.inputPerMillion, 5.0)
+        XCTAssertEqual(opus48.cacheWritePerMillion, 6.25)
+        XCTAssertEqual(opus48.cacheReadPerMillion, 0.5)
+        XCTAssertEqual(opus48.outputPerMillion, 25.0)
+        let opus48Fast = try XCTUnwrap(manifest.pricing["claude-4.8-opus-fast"])
+        XCTAssertEqual(opus48Fast.inputPerMillion, 30.0)
+        XCTAssertEqual(opus48Fast.cacheWritePerMillion, 37.5)
+        XCTAssertEqual(opus48Fast.cacheReadPerMillion, 3.0)
+        XCTAssertEqual(opus48Fast.outputPerMillion, 150.0)
+        XCTAssertEqual(opus48Fast.familyID, "claude-4.8-opus")
 
         let gpt55 = try XCTUnwrap(manifest.pricing["gpt-5.5"])
         let gpt55Fast = try XCTUnwrap(manifest.pricing["gpt-5.5-fast"])
@@ -42,11 +56,20 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(grokBuild.cacheWritePerMillion, 1.0)
         XCTAssertEqual(grokBuild.cacheReadPerMillion, 0.2)
         XCTAssertEqual(grokBuild.outputPerMillion, 2.0)
+
+        let gemini35Flash = try XCTUnwrap(manifest.pricing["gemini-3.5-flash"])
+        XCTAssertEqual(gemini35Flash.inputPerMillion, 1.5)
+        XCTAssertEqual(gemini35Flash.cacheWritePerMillion, 1.5)
+        XCTAssertEqual(gemini35Flash.cacheReadPerMillion, 0.15)
+        XCTAssertEqual(gemini35Flash.outputPerMillion, 9.0)
     }
 
     func testPricingResolvesModelFamily() {
         XCTAssertEqual(Pricing.family(for: "claude-opus-4-7-high")?.displayName, "Claude 4.7 Opus")
         XCTAssertEqual(Pricing.family(for: "claude-opus-4-7-thinking-high")?.displayName, "Claude 4.7 Opus")
+        XCTAssertEqual(Pricing.family(for: "claude-opus-4-8-thinking-high")?.displayName, "Claude 4.8 Opus")
+        XCTAssertEqual(Pricing.family(for: "claude-opus-4-8-thinking-max")?.displayName, "Claude 4.8 Opus")
+        XCTAssertEqual(Pricing.family(for: "claude-opus-4-8-thinking-high-fast")?.displayName, "Claude 4.8 Opus")
         XCTAssertEqual(Pricing.family(for: "composer-2-fast")?.displayName, "Composer 2")
         XCTAssertEqual(Pricing.family(for: "composer-2.5")?.displayName, "Composer 2.5")
         XCTAssertEqual(Pricing.family(for: "composer-2.5-fast")?.displayName, "Composer 2.5")
@@ -61,6 +84,7 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-extra-high")?.displayName, "GPT-5.5")
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-high-fast")?.displayName, "GPT-5.5")
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-extra-high-fast")?.displayName, "GPT-5.5")
+        XCTAssertEqual(Pricing.family(for: "gemini-3.5-flash")?.displayName, "Gemini 3.5 Flash")
         XCTAssertEqual(Pricing.family(for: "default")?.displayName, "Auto")
     }
 
