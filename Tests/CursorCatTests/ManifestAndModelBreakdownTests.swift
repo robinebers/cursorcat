@@ -5,7 +5,7 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
     func testBundledManifestLoadsFamilyMetadata() throws {
         let manifest = try BundledModelManifestSource().loadManifest()
 
-        XCTAssertEqual(manifest.retrievedAt, "2026-05-28")
+        XCTAssertEqual(manifest.retrievedAt, "2026-06-09")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyID, "claude-4.7-opus")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyDisplayName, "Claude 4.7 Opus")
 
@@ -24,6 +24,18 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(opus48Fast.familyID, "claude-4.8-opus")
         XCTAssertEqual(opus48Fast.inputPerMillion, opus48.inputPerMillion * 2)
         XCTAssertEqual(opus48Fast.outputPerMillion, opus48.outputPerMillion * 2)
+
+        let fable5 = try XCTUnwrap(manifest.pricing["claude-fable-5"])
+        XCTAssertEqual(fable5.familyID, "claude-fable-5")
+        XCTAssertEqual(fable5.familyDisplayName, "Claude Fable 5")
+        XCTAssertEqual(fable5.inputPerMillion, 10.0)
+        XCTAssertEqual(fable5.cacheWritePerMillion, 12.5)
+        XCTAssertEqual(fable5.cacheReadPerMillion, 1.0)
+        XCTAssertEqual(fable5.outputPerMillion, 50.0)
+        XCTAssertEqual(fable5.inputPerMillion, opus48.inputPerMillion * 2)
+        XCTAssertEqual(fable5.cacheWritePerMillion, opus48.cacheWritePerMillion * 2)
+        XCTAssertEqual(fable5.cacheReadPerMillion, opus48.cacheReadPerMillion * 2)
+        XCTAssertEqual(fable5.outputPerMillion, opus48.outputPerMillion * 2)
 
         let gpt55 = try XCTUnwrap(manifest.pricing["gpt-5.5"])
         let gpt55Fast = try XCTUnwrap(manifest.pricing["gpt-5.5-fast"])
@@ -72,6 +84,8 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(Pricing.family(for: "claude-opus-4-8-thinking-high")?.displayName, "Claude 4.8 Opus")
         XCTAssertEqual(Pricing.family(for: "claude-opus-4-8-thinking-max")?.displayName, "Claude 4.8 Opus")
         XCTAssertEqual(Pricing.family(for: "claude-opus-4-8-thinking-high-fast")?.displayName, "Claude 4.8 Opus")
+        XCTAssertEqual(Pricing.family(for: "claude-fable-5")?.displayName, "Claude Fable 5")
+        XCTAssertEqual(Pricing.family(for: "claude-fable-5-thinking-xhigh")?.displayName, "Claude Fable 5")
         XCTAssertEqual(Pricing.family(for: "composer-2-fast")?.displayName, "Composer 2")
         XCTAssertEqual(Pricing.family(for: "composer-2.5")?.displayName, "Composer 2.5")
         XCTAssertEqual(Pricing.family(for: "composer-2.5-fast")?.displayName, "Composer 2.5")
