@@ -87,6 +87,15 @@ fi
 cp "$ICON_ICNS" "$APP_RESOURCES/AppIcon.icns"
 cp "$ICON_ASSET_CAR" "$APP_RESOURCES/Assets.car"
 chmod +x "$APP_BINARY"
+# SwiftPM stamps LC_BUILD_VERSION's `sdk` field with the deployment target (macOS 15), not the real
+# SDK it compiled against. macOS gates the modern Liquid Glass control appearance (pop-up buttons,
+# pickers, etc.) on the linked SDK — a "15.0" stamp makes AppKit fall back to legacy Aqua controls.
+# Restamp the sdk to 26.0 (Tahoe, where Liquid Glass landed) while keeping minos at MIN_SYSTEM_VERSION
+# so the app still runs on macOS 15 but gets the modern controls. Re-signed below.
+echo "==> stamping linked SDK 26.0 for Liquid Glass controls (minos stays $MIN_SYSTEM_VERSION)"
+vtool -set-build-version macos "$MIN_SYSTEM_VERSION" 26.0 -replace -output "$APP_BINARY.tmp" "$APP_BINARY"
+mv "$APP_BINARY.tmp" "$APP_BINARY"
+chmod +x "$APP_BINARY"
 load_sparkle_public_key
 embed_sparkle_framework
 

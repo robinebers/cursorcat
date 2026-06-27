@@ -5,6 +5,7 @@
 - Xcode Debug uses `script/CursorCat.dev.entitlements.plist`; Release should not.
 - If the repo path changes, clear `.build/` before rebuilding so SwiftPM does not reuse module-cache paths from the old location.
 - `package_release.sh` defaults to `app` mode, not a full release flow. Use `release` for the full flow.
+- Liquid Glass targeting: `build_and_run.sh` and `package_release.sh` restamp the staged binary's linked SDK to 26.0 (`vtool -set-build-version macos 15.0 26.0`) so AppKit renders Liquid Glass controls; `Package.swift` stays at `.macOS(.v15)` for the runtime floor. SwiftPM otherwise stamps `LC_BUILD_VERSION.sdk` to the deployment target (15.0), which makes the app look like a macOS 15 build. Don't remove the vtool step.
 
 ## Task Actions
 
