@@ -5,7 +5,7 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
     func testBundledManifestLoadsFamilyMetadata() throws {
         let manifest = try BundledModelManifestSource().loadManifest()
 
-        XCTAssertEqual(manifest.retrievedAt, "2026-06-09")
+        XCTAssertEqual(manifest.retrievedAt, "2026-06-27")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyID, "claude-4.7-opus")
         XCTAssertEqual(manifest.pricing["claude-4.7-opus"]?.familyDisplayName, "Claude 4.7 Opus")
 
@@ -102,6 +102,8 @@ final class ManifestAndModelBreakdownTests: XCTestCase {
         XCTAssertEqual(Pricing.family(for: "gpt-5.5-extra-high-fast")?.displayName, "GPT-5.5")
         XCTAssertEqual(Pricing.family(for: "gemini-3.5-flash")?.displayName, "Gemini 3.5 Flash")
         XCTAssertEqual(Pricing.family(for: "default")?.displayName, "Auto")
+        XCTAssertEqual(Pricing.family(for: "glm-5.2")?.displayName, "GLM 5.2")
+        XCTAssertEqual(Pricing.family(for: "glm-5.2-max")?.displayName, "GLM 5.2")
     }
 
     func testComposer25CostEstimation() {
